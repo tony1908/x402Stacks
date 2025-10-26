@@ -16,8 +16,6 @@ console.log('Address:', keypair.address);
 console.log('Private Key:', keypair.privateKey);
 console.log('\n⚠️  Fund this address with testnet STX from: https://explorer.stacks.co/sandbox/faucet?chain=testnet\n');
 
-
-console.log("address:", "ST2FTX7ECAW8C6EYDBCZ3R7JE11CYBF23ZCFQ7M4Y")
 // Create payment client
 const client = new X402PaymentClient({
   network: NETWORK,
