@@ -1,0 +1,37 @@
+{
+  "name": "x402-stacks",
+  "version": "1.0.0",
+  "description": "TypeScript library for implementing x402 payment protocol on Stacks blockchain",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "dev:server": "ts-node examples/server.ts",
+    "dev:client": "ts-node examples/client.ts",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "x402",
+    "stacks",
+    "blockchain",
+    "payments",
+    "micropayments",
+    "api-payments"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@stacks/transactions": "^6.13.0",
+    "@stacks/network": "^6.13.0",
+    "axios": "^1.6.0",
+    "express": "^4.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/express": "^4.17.0",
+    "typescript": "^5.3.0",
+    "ts-node": "^10.9.0"
+  }
+}
