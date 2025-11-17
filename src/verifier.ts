@@ -50,6 +50,8 @@ export class X402PaymentVerifier {
         expected_sender: options.expectedSender,
         expected_memo: options.expectedMemo,
         network: this.network,
+        resource: options.resource,
+        method: options.method,
       };
 
       // Call facilitator API

@@ -136,6 +136,12 @@ export interface VerificationOptions {
 
   /** Maximum age of transaction in seconds (optional) */
   maxAge?: number;
+
+  /** API resource being accessed (optional, for x402 tracking) */
+  resource?: string;
+
+  /** HTTP method being used (optional, for x402 tracking) */
+  method?: string;
 }
 
 /**
@@ -236,6 +242,12 @@ export interface FacilitatorVerifyRequest {
 
   /** Network type */
   network: NetworkType;
+
+  /** API resource being accessed (optional, for x402 tracking) */
+  resource?: string;
+
+  /** HTTP method being used (optional, for x402 tracking) */
+  method?: string;
 }
 
 /**
@@ -274,6 +286,12 @@ export interface FacilitatorVerifyResponse {
 
   /** Network */
   network?: string;
+
+  /** API resource accessed */
+  resource?: string;
+
+  /** HTTP method used */
+  method?: string;
 
   /** Validation errors if invalid */
   validation_errors?: string[];

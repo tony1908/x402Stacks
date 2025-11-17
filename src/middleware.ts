@@ -36,6 +36,8 @@ export function x402PaymentRequired(config: X402MiddlewareConfig) {
       const verificationOptions: VerificationOptions = {
         expectedRecipient: config.address,
         minAmount: BigInt(config.amount),
+        resource: config.resource || req.path,
+        method: req.method,
       };
 
       const verification = await verifier.verifyPayment(

@@ -26,7 +26,7 @@ const FACILITATOR_URL = process.env.FACILITATOR_URL || 'http://localhost:8085';
 app.get(
   '/api/premium-data',
   x402PaymentRequired({
-    amount: STXtoMicroSTX(0.1), // 0.1 STX
+    amount: STXtoMicroSTX(0.001), // 0.1 STX
     address: SERVER_ADDRESS,
     network: NETWORK,
     facilitatorUrl: FACILITATOR_URL,
