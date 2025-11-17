@@ -154,6 +154,9 @@ export interface X402MiddlewareConfig {
   /** Network to use */
   network: NetworkType;
 
+  /** Facilitator API URL for payment verification */
+  facilitatorUrl?: string;
+
   /** Resource identifier (defaults to request path) */
   resource?: string;
 
@@ -208,9 +211,82 @@ export interface X402ClientConfig {
   /** Private key for signing transactions */
   privateKey: string;
 
+  /** Facilitator API URL for payment verification (optional) */
+  facilitatorUrl?: string;
+
   /** Custom API endpoint (optional) */
   apiEndpoint?: string;
 
   /** Request timeout in milliseconds (default: 30000) */
   timeout?: number;
+}
+
+/**
+ * Facilitator API request for payment verification
+ */
+export interface FacilitatorVerifyRequest {
+  /** Transaction ID to verify */
+  tx_id: string;
+
+  /** Expected recipient address */
+  expected_recipient: string;
+
+  /** Minimum amount in microSTX */
+  min_amount: number;
+
+  /** Expected sender address (optional) */
+  expected_sender?: string;
+
+  /** Expected memo (optional) */
+  expected_memo?: string;
+
+  /** Accept unconfirmed transactions */
+  accept_unconfirmed?: boolean;
+
+  /** Network type */
+  network: NetworkType;
+}
+
+/**
+ * Facilitator API response for payment verification
+ */
+export interface FacilitatorVerifyResponse {
+  /** Whether payment is valid */
+  valid: boolean;
+
+  /** Transaction ID */
+  tx_id?: string;
+
+  /** Sender address */
+  sender_address?: string;
+
+  /** Recipient address */
+  recipient_address?: string;
+
+  /** Amount in microSTX */
+  amount?: number;
+
+  /** Transaction fee */
+  fee?: number;
+
+  /** Transaction nonce */
+  nonce?: number;
+
+  /** Transaction status */
+  status?: string;
+
+  /** Block height */
+  block_height?: number;
+
+  /** Transaction memo */
+  memo?: string;
+
+  /** Network */
+  network?: string;
+
+  /** Validation errors if invalid */
+  validation_errors?: string[];
+
+  /** Error message */
+  error?: string;
 }

@@ -3,6 +3,7 @@
  * Express.js server with x402 payment-gated endpoints
  */
 
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import {
   x402PaymentRequired,
@@ -15,9 +16,11 @@ import {
 const app = express();
 app.use(express.json());
 
-// Server configuration
-const SERVER_ADDRESS = ''; // Replace with your address
-const NETWORK = 'testnet';
+// Server configuration from environment variables
+const SERVER_ADDRESS = process.env.SERVER_ADDRESS || 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM';
+const NETWORK = (process.env.NETWORK as 'mainnet' | 'testnet') || 'testnet';
+const PORT = process.env.PORT || 3003;
+const FACILITATOR_URL = process.env.FACILITATOR_URL || 'http://localhost:8085';
 
 // Example 1: Simple payment-gated endpoint
 app.get(
@@ -26,6 +29,7 @@ app.get(
     amount: STXtoMicroSTX(0.1), // 0.1 STX
     address: SERVER_ADDRESS,
     network: NETWORK,
+    facilitatorUrl: FACILITATOR_URL,
     acceptUnconfirmed: true, // Accept unconfirmed for faster testing
   }),
   (req: Request, res: Response) => {
@@ -70,6 +74,7 @@ app.get(
     {
       address: SERVER_ADDRESS,
       network: NETWORK,
+      facilitatorUrl: FACILITATOR_URL,
       acceptUnconfirmed: true,
     }
   ),
@@ -106,6 +111,7 @@ app.get(
       amount: STXtoMicroSTX(0.02),
       address: SERVER_ADDRESS,
       network: NETWORK,
+      facilitatorUrl: FACILITATOR_URL,
       acceptUnconfirmed: true,
     },
     keyGenerator: (req) => {
@@ -141,6 +147,7 @@ app.post(
     amount: STXtoMicroSTX(0.5),
     address: SERVER_ADDRESS,
     network: NETWORK,
+    facilitatorUrl: FACILITATOR_URL,
     acceptUnconfirmed: false, // Require confirmation for high-value requests
     paymentValidator: async (payment) => {
       // Custom validation logic
@@ -185,11 +192,11 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`x402-stacks server running on port ${PORT}`);
   console.log(`Network: ${NETWORK}`);
   console.log(`Payment address: ${SERVER_ADDRESS}`);
+  console.log(`Facilitator URL: ${FACILITATOR_URL}`);
   console.log('\nAvailable endpoints:');
   console.log('  GET  /health - Health check (free)');
   console.log('  GET  /api/premium-data - Premium data (0.1 STX)');

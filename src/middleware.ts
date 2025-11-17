@@ -16,7 +16,8 @@ import { randomBytes } from 'crypto';
  * Express middleware for x402 payment requirements
  */
 export function x402PaymentRequired(config: X402MiddlewareConfig) {
-  const verifier = new X402PaymentVerifier(config.network);
+  const facilitatorUrl = config.facilitatorUrl || 'http://localhost:8085';
+  const verifier = new X402PaymentVerifier(facilitatorUrl, config.network);
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {

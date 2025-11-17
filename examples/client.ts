@@ -3,23 +3,45 @@
  * Client for making requests to x402-enabled APIs
  */
 
+import 'dotenv/config';
 import { X402PaymentClient, generateKeypair, formatPaymentAmount, getExplorerURL, X402PaymentRequired } from '../src';
 
 // Configuration
-const NETWORK = 'testnet';
-const SERVER_URL = 'http://localhost:3000';
+const NETWORK = (process.env.NETWORK as 'mainnet' | 'testnet') || 'testnet';
+const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3003';
 
-// Generate a keypair for testing (in production, use existing wallet)
-const keypair = generateKeypair(NETWORK);
-console.log('Generated test wallet:');
-console.log('Address:', keypair.address);
-console.log('Private Key:', keypair.privateKey);
-console.log('\n⚠️  Fund this address with testnet STX from: https://explorer.stacks.co/sandbox/faucet?chain=testnet\n');
+// Load private key from environment, or generate a new one
+let privateKey: string;
+let address: string;
+
+if (process.env.CLIENT_PRIVATE_KEY) {
+  // Use existing private key from .env
+  privateKey = process.env.CLIENT_PRIVATE_KEY;
+  address = process.env.CLIENT_ADDRESS || 'Unknown (add CLIENT_ADDRESS to .env)';
+  console.log('Using existing wallet from .env:');
+  console.log('address: ', address);
+} else {
+  // Generate a new keypair for first-time setup
+  const keypair = generateKeypair(NETWORK);
+  privateKey = keypair.privateKey;
+  address = keypair.address;
+
+  console.log('\n' + '='.repeat(70));
+  console.log('⚠️  NO PRIVATE KEY FOUND IN .ENV - GENERATED NEW WALLET');
+  console.log('='.repeat(70));
+  console.log('\n📝 To reuse this wallet, add these to your .env file:\n');
+  console.log(`CLIENT_PRIVATE_KEY=${keypair.privateKey}`);
+  console.log(`CLIENT_ADDRESS=${keypair.address}`);
+  console.log('\n💰 Fund this address with testnet STX:');
+  console.log('https://explorer.stacks.co/sandbox/faucet?chain=testnet');
+  console.log('\nAddress:', keypair.address);
+  console.log('='.repeat(70) + '\n');
+}
 
 // Create payment client
 const client = new X402PaymentClient({
   network: NETWORK,
-  privateKey: keypair.privateKey, 
+  privateKey,
 });
 
 /**

@@ -29,6 +29,8 @@ export type {
   X402MiddlewareConfig,
   StacksTransaction,
   X402ClientConfig,
+  FacilitatorVerifyRequest,
+  FacilitatorVerifyResponse,
 } from './types';
 
 // Utilities
