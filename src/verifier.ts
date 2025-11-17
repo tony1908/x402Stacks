@@ -35,20 +35,20 @@ export class X402PaymentVerifier {
 
   /**
    * Verify a payment transaction using facilitator API
+   * Always requires confirmed transactions
    */
   async verifyPayment(
     txId: string,
     options: VerificationOptions
   ): Promise<VerifiedPayment> {
     try {
-      // Build facilitator API request
+      // Build facilitator API request (always require confirmed transactions)
       const request: FacilitatorVerifyRequest = {
         tx_id: txId,
         expected_recipient: options.expectedRecipient,
         min_amount: Number(options.minAmount),
         expected_sender: options.expectedSender,
         expected_memo: options.expectedMemo,
-        accept_unconfirmed: options.acceptUnconfirmed || false,
         network: this.network,
       };
 
@@ -147,6 +147,7 @@ export class X402PaymentVerifier {
 
   /**
    * Wait for transaction confirmation with polling
+   * Polls until transaction is confirmed on blockchain
    */
   async waitForConfirmation(
     txId: string,
@@ -155,10 +156,7 @@ export class X402PaymentVerifier {
     intervalMs: number = 30000
   ): Promise<VerifiedPayment | null> {
     for (let i = 0; i < maxAttempts; i++) {
-      const verification = await this.verifyPayment(txId, {
-        ...options,
-        acceptUnconfirmed: true,
-      });
+      const verification = await this.verifyPayment(txId, options);
 
       if (verification.isValid && verification.status === 'success') {
         return verification;

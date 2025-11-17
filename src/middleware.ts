@@ -32,11 +32,10 @@ export function x402PaymentRequired(config: X402MiddlewareConfig) {
         return sendPaymentRequired(req, res, config);
       }
 
-      // Verify the payment
+      // Verify the payment (always requires confirmation)
       const verificationOptions: VerificationOptions = {
         expectedRecipient: config.address,
         minAmount: BigInt(config.amount),
-        acceptUnconfirmed: config.acceptUnconfirmed || false,
       };
 
       const verification = await verifier.verifyPayment(
@@ -53,11 +52,11 @@ export function x402PaymentRequired(config: X402MiddlewareConfig) {
         });
       }
 
-      // Check payment status
-      if (verification.status === 'pending' && !config.acceptUnconfirmed) {
+      // Check payment status - must be confirmed
+      if (verification.status === 'pending') {
         return res.status(402).json({
           error: 'Payment not yet confirmed',
-          details: 'Please wait for transaction confirmation',
+          details: 'Please wait for transaction confirmation on the blockchain',
           paymentStatus: 'pending',
         });
       }

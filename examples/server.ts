@@ -30,7 +30,6 @@ app.get(
     address: SERVER_ADDRESS,
     network: NETWORK,
     facilitatorUrl: FACILITATOR_URL,
-    acceptUnconfirmed: true, // Accept unconfirmed for faster testing
   }),
   (req: Request, res: Response) => {
     const payment = getPayment(req);
@@ -75,7 +74,6 @@ app.get(
       address: SERVER_ADDRESS,
       network: NETWORK,
       facilitatorUrl: FACILITATOR_URL,
-      acceptUnconfirmed: true,
     }
   ),
   (req: Request, res: Response) => {
@@ -112,7 +110,6 @@ app.get(
       address: SERVER_ADDRESS,
       network: NETWORK,
       facilitatorUrl: FACILITATOR_URL,
-      acceptUnconfirmed: true,
     },
     keyGenerator: (req) => {
       // Use IP address or custom identifier
@@ -148,7 +145,6 @@ app.post(
     address: SERVER_ADDRESS,
     network: NETWORK,
     facilitatorUrl: FACILITATOR_URL,
-    acceptUnconfirmed: false, // Require confirmation for high-value requests
     paymentValidator: async (payment) => {
       // Custom validation logic
       console.log('Validating payment:', payment.txId);
@@ -199,10 +195,10 @@ app.listen(PORT, () => {
   console.log(`Facilitator URL: ${FACILITATOR_URL}`);
   console.log('\nAvailable endpoints:');
   console.log('  GET  /health - Health check (free)');
-  console.log('  GET  /api/premium-data - Premium data (0.1 STX)');
-  console.log('  GET  /api/market-data?type=basic|standard|premium - Market data (tiered pricing)');
-  console.log('  GET  /api/search?q=query - Search (10 free/hour, then 0.02 STX)');
-  console.log('  POST /api/compute - Compute task (0.5 STX, requires confirmation)');
+  console.log('  GET  /api/premium-data - Premium data (0.1 STX, confirmed)');
+  console.log('  GET  /api/market-data?type=basic|standard|premium - Market data (tiered pricing, confirmed)');
+  console.log('  GET  /api/search?q=query - Search (10 free/hour, then 0.02 STX, confirmed)');
+  console.log('  POST /api/compute - Compute task (0.5 STX, confirmed)');
 });
 
 export default app;

@@ -134,9 +134,6 @@ export interface VerificationOptions {
   /** Expected memo/nonce (optional) */
   expectedMemo?: string;
 
-  /** Whether to accept unconfirmed transactions */
-  acceptUnconfirmed?: boolean;
-
   /** Maximum age of transaction in seconds (optional) */
   maxAge?: number;
 }
@@ -162,9 +159,6 @@ export interface X402MiddlewareConfig {
 
   /** Payment expiration time in seconds (default: 300) */
   expirationSeconds?: number;
-
-  /** Whether to accept unconfirmed transactions (default: false) */
-  acceptUnconfirmed?: boolean;
 
   /** Custom nonce generator (optional) */
   nonceGenerator?: () => string;
@@ -239,9 +233,6 @@ export interface FacilitatorVerifyRequest {
 
   /** Expected memo (optional) */
   expected_memo?: string;
-
-  /** Accept unconfirmed transactions */
-  accept_unconfirmed?: boolean;
 
   /** Network type */
   network: NetworkType;
