@@ -1,6 +1,6 @@
 {
   "name": "x402-stacks",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "TypeScript library for implementing x402 payment protocol on Stacks blockchain",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
