@@ -1,29 +1,29 @@
 # x402-stacks
 
-Una biblioteca TypeScript para implementar el protocolo de pago x402 en Stacks.
+A TypeScript library for implementing the x402 payment protocol on Stacks blockchain.
 
-x402 hace posible los **pagos automáticos a nivel HTTP** para APIs, agentes de IA y servicios digitales usando tokens STX en Stacks. Paga solo lo que usas, justo cuando lo usas. Sin suscripciones, sin claves API, sin intermediarios.
+x402 enables **automatic HTTP-level payments** for APIs, AI agents, and digital services using STX tokens on Stacks. Pay only for what you use, right when you use it. No subscriptions, no API keys, no intermediaries.
 
-## Características
+## Features
 
-- **HTTP 402 Payment Required** - Protocolo de pago nativo usando los códigos de estado HTTP que ya conoces
-- **Pagos Automáticos** - El cliente paga solo y reintenta las peticiones
-- **Verificación de Pagos** - Validación en el servidor de las transferencias STX
-- **Middleware para Express.js** - Instala y listo, protege tus endpoints con pagos
-- **Precios Flexibles** - Configura precios fijos, por niveles o dinámicos
-- **Rate Limiting** - Plan gratuito con opción de pagar cuando te pasas del límite
-- **TypeScript** - Todo tipado con IntelliSense incluido
-- **Seguridad de Bitcoin** - Aprovecha el anclaje de Bitcoin de Stacks
+- **HTTP 402 Payment Required** - Native payment protocol using HTTP status codes you already know
+- **Automatic Payments** - Client pays automatically and retries requests
+- **Payment Verification** - Server-side validation of STX transfers
+- **Express.js Middleware** - Plug and play, protect your endpoints with payments
+- **Flexible Pricing** - Configure fixed prices, tiered, or dynamic pricing
+- **Rate Limiting** - Free tier with pay-when-you-exceed option
+- **TypeScript** - Fully typed with IntelliSense included
+- **Bitcoin Security** - Leverages Stacks' Bitcoin anchoring
 
-## Instalación
+## Installation
 
 ```bash
 npm install x402-stacks
 ```
 
-## Empieza rápido
+## Quick Start
 
-### Servidor (Express.js)
+### Server (Express.js)
 
 ```typescript
 import express from 'express';
@@ -35,50 +35,50 @@ app.get(
   '/api/premium-data',
   x402PaymentRequired({
     amount: STXtoMicroSTX(0.1), // 0.1 STX
-    address: 'SP1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM', // Tu dirección de Stacks
+    address: 'SP1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM', // Your Stacks address
     network: 'mainnet',
     acceptUnconfirmed: true,
   }),
   (req, res) => {
-    res.json({ data: 'Este es contenido premium' });
+    res.json({ data: 'This is premium content' });
   }
 );
 
 app.listen(3000);
 ```
 
-### Cliente
+### Client
 
 ```typescript
 import { X402PaymentClient } from 'x402-stacks';
 
 const client = new X402PaymentClient({
   network: 'mainnet',
-  privateKey: 'tu-clave-privada-hex',
+  privateKey: 'your-private-key-hex',
 });
 
-// Maneja automáticamente las respuestas 402 y hace los pagos
+// Automatically handles 402 responses and makes payments
 const data = await client.requestWithPayment('https://api.example.com/premium-data');
 console.log(data);
 ```
 
-## ¿Cómo funciona?
+## How Does It Work?
 
-### El flujo de pago
+### The Payment Flow
 
 ```
-1. El cliente pide acceso a la API → El servidor responde 402 con los datos del pago
-2. El cliente arma la transferencia STX con esos datos
-3. El cliente envía la transacción → recibe un ID de transacción
-4. El cliente vuelve a intentar con el ID en el header
-5. El servidor verifica la transacción en Stacks
-6. El servidor valida: destinatario, monto, estado
-7. Si todo está bien, acceso concedido
+1. Client requests API access → Server responds 402 with payment details
+2. Client builds STX transfer with those details
+3. Client sends transaction → receives transaction ID
+4. Client retries with ID in header
+5. Server verifies transaction on Stacks
+6. Server validates: recipient, amount, status
+7. If everything checks out, access granted
 ```
 
-### La respuesta 402 Payment Required
+### The 402 Payment Required Response
 
-Cuando un cliente pide un endpoint de pago sin haber pagado, el servidor responde con HTTP 402:
+When a client requests a payment endpoint without having paid, the server responds with HTTP 402:
 
 ```json
 {
@@ -92,9 +92,9 @@ Cuando un cliente pide un endpoint de pago sin haber pagado, el servidor respond
 }
 ```
 
-## Referencia de la API
+## API Reference
 
-### Cliente
+### Client
 
 #### `X402PaymentClient`
 
@@ -105,35 +105,35 @@ const client = new X402PaymentClient({
   timeout?: number,
 });
 
-// Hace la petición con pago automático
+// Make request with automatic payment
 await client.requestWithPayment<T>(url, options?);
 
-// Hace un pago manual
+// Make manual payment
 await client.makePayment(paymentRequest);
 
-// Envía una transferencia STX
+// Send STX transfer
 await client.sendSTXTransfer(details);
 ```
 
-### Servidor
+### Server
 
-#### Middleware `x402PaymentRequired`
+#### `x402PaymentRequired` Middleware
 
 ```typescript
 x402PaymentRequired({
-  amount: string | bigint,           // Monto en microSTX
-  address: string,                   // Tu dirección de Stacks
+  amount: string | bigint,           // Amount in microSTX
+  address: string,                   // Your Stacks address
   network: 'mainnet' | 'testnet',
-  resource?: string,                 // Identificador personalizado del recurso
-  expirationSeconds?: number,        // Por defecto: 300
-  acceptUnconfirmed?: boolean,       // Por defecto: false
+  resource?: string,                 // Custom resource identifier
+  expirationSeconds?: number,        // Default: 300
+  acceptUnconfirmed?: boolean,       // Default: false
   paymentValidator?: (payment) => boolean,
 })
 ```
 
-#### Middleware Avanzado
+#### Advanced Middleware
 
-**Precios por niveles**:
+**Tiered pricing**:
 ```typescript
 tieredPayment(
   (req) => ({
@@ -144,11 +144,11 @@ tieredPayment(
 )
 ```
 
-**Rate limiting con pagos**:
+**Rate limiting with payments**:
 ```typescript
 paymentRateLimit({
   freeRequests: 10,
-  windowMs: 60 * 60 * 1000, // 1 hora
+  windowMs: 60 * 60 * 1000, // 1 hour
   paymentConfig: {
     amount: STXtoMicroSTX(0.01),
     address,
@@ -157,7 +157,7 @@ paymentRateLimit({
 })
 ```
 
-**Pagos condicionales**:
+**Conditional payments**:
 ```typescript
 conditionalPayment(
   (req) => req.user?.isPremium !== true,
@@ -165,14 +165,14 @@ conditionalPayment(
 )
 ```
 
-### Verificador de Pagos
+### Payment Verifier
 
 ```typescript
 import { X402PaymentVerifier } from 'x402-stacks';
 
 const verifier = new X402PaymentVerifier('mainnet');
 
-// Verifica la transacción de pago
+// Verify payment transaction
 const verification = await verifier.verifyPayment(txId, {
   expectedRecipient: 'SP1...',
   minAmount: BigInt(100000),
@@ -180,14 +180,14 @@ const verification = await verifier.verifyPayment(txId, {
 });
 
 if (verification.isValid) {
-  // Dale acceso
+  // Grant access
 }
 
-// Espera la confirmación
+// Wait for confirmation
 const tx = await verifier.waitForConfirmation(txId, maxAttempts, intervalMs);
 ```
 
-### Utilidades
+### Utilities
 
 ```typescript
 import {
@@ -201,27 +201,27 @@ import {
   parsePaymentMemo,
 } from 'x402-stacks';
 
-// Convierte montos
+// Convert amounts
 const microSTX = STXtoMicroSTX(1.5);        // 1500000n
 const stx = microSTXtoSTX(1500000n);        // "1.500000"
 
-// Genera una wallet
+// Generate a wallet
 const wallet = generateKeypair('testnet');
 // { privateKey, publicKey, address }
 
-// Valida una dirección
+// Validate an address
 isValidStacksAddress('SP1...');  // true
 
-// Formatea para mostrar
+// Format for display
 formatPaymentAmount(100000n);    // "0.100000 STX"
 
-// Obtén el link del explorador
+// Get explorer link
 getExplorerURL(txId, 'mainnet');
 ```
 
-## Ejemplos
+## Examples
 
-### Ejemplo 1: Una puerta de pago simple
+### Example 1: Simple Payment Gate
 
 ```typescript
 // server.ts
@@ -233,7 +233,7 @@ app.get(
     network: 'mainnet',
   }),
   (req, res) => {
-    res.json({ data: 'Contenido premium' });
+    res.json({ data: 'Premium content' });
   }
 );
 
@@ -241,7 +241,7 @@ app.get(
 const data = await client.requestWithPayment('https://api.example.com/data');
 ```
 
-### Ejemplo 2: Precios según el uso
+### Example 2: Usage-Based Pricing
 
 ```typescript
 app.get(
@@ -263,7 +263,7 @@ app.get(
 );
 ```
 
-### Ejemplo 3: Validación personalizada
+### Example 3: Custom Validation
 
 ```typescript
 app.post(
@@ -272,33 +272,33 @@ app.post(
     amount: STXtoMicroSTX(0.25),
     address: SERVER_ADDRESS,
     network: 'mainnet',
-    acceptUnconfirmed: false, // Exige confirmación
+    acceptUnconfirmed: false, // Require confirmation
     paymentValidator: async (payment) => {
-      // Tu lógica de validación
+      // Your validation logic
       const isAllowed = await checkUserAllowlist(payment.sender);
       return isAllowed && payment.amount >= STXtoMicroSTX(0.25);
     },
   }),
   async (req, res) => {
-    // Maneja la subida del archivo
+    // Handle file upload
   }
 );
 ```
 
-### Ejemplo 4: Control manual del pago
+### Example 4: Manual Payment Control
 
 ```typescript
-// Control manual desde el cliente
+// Manual payment control from client
 try {
   const response = await fetch('https://api.example.com/data');
 
   if (response.status === 402) {
     const paymentRequest = await response.json();
 
-    // Hace el pago
+    // Make payment
     const paymentResult = await client.makePayment(paymentRequest);
 
-    // Vuelve a intentar con el comprobante
+    // Retry with proof of payment
     const retryResponse = await fetch('https://api.example.com/data', {
       headers: {
         'X-Payment-TxId': paymentResult.txId,
@@ -308,34 +308,34 @@ try {
     const data = await retryResponse.json();
   }
 } catch (error) {
-  console.error('Error en el pago:', error);
+  console.error('Payment error:', error);
 }
 ```
 
-## Casos de uso
+## Use Cases
 
-### Agentes de IA
-Deja que los agentes de IA paguen de forma autónoma por:
-- Datos en tiempo real ($0.01/consulta)
-- Acceso a APIs ($0.05/petición)
-- Cómputo ($0.50/minuto)
-- Almacenamiento ($0.001/GB)
+### AI Agents
+Let AI agents pay autonomously for:
+- Real-time data ($0.01/query)
+- API access ($0.05/request)
+- Compute ($0.50/minute)
+- Storage ($0.001/GB)
 
-### Micropagos
-Monta modelos de negocio donde pagas por lo que usas:
-- Acceso a artículos ($0.10/artículo)
-- Procesamiento de imágenes ($0.005/imagen)
-- Llamadas a API ($0.02/llamada)
-- Consultas de datos ($0.03/consulta)
+### Micropayments
+Build pay-as-you-go business models:
+- Article access ($0.10/article)
+- Image processing ($0.005/image)
+- API calls ($0.02/call)
+- Data queries ($0.03/query)
 
-### Precios dinámicos
-Implementa precios flexibles:
-- Por horario (pico/valle)
-- Por uso (complejidad, tamaño)
-- Por niveles (básico/premium)
-- Con límite gratis + pago cuando te pasas
+### Dynamic Pricing
+Implement flexible pricing:
+- Time-based (peak/off-peak)
+- Usage-based (complexity, size)
+- Tiered (basic/premium)
+- Free tier with pay-when-exceeded
 
-## Desarrollo
+## Development
 
 ### Build
 
@@ -344,23 +344,23 @@ npm install
 npm run build
 ```
 
-### Corre los ejemplos
+### Run Examples
 
 ```bash
-# Terminal 1: Arranca el servidor
+# Terminal 1: Start server
 npm run dev:server
 
-# Terminal 2: Fondea tu wallet de prueba y corre el cliente
+# Terminal 2: Fund your test wallet and run client
 npm run dev:client
 ```
 
 ### Testing
 
-Consigue fondos testnet en el [Faucet de Stacks](https://explorer.stacks.co/sandbox/faucet?chain=testnet).
+Get testnet funds from the [Stacks Faucet](https://explorer.stacks.co/sandbox/faucet?chain=testnet).
 
-## Configuración
+## Configuration
 
-### Elegir la red
+### Choosing the Network
 
 ```typescript
 // Mainnet
@@ -369,59 +369,59 @@ const client = new X402PaymentClient({
   privateKey: process.env.PRIVATE_KEY,
 });
 
-// Testnet (para desarrollo)
+// Testnet (for development)
 const client = new X402PaymentClient({
   network: 'testnet',
   privateKey: process.env.TESTNET_PRIVATE_KEY,
 });
 ```
 
-### Buenas prácticas de seguridad
+### Security Best Practices
 
-1. **Nunca subas claves privadas a git** - Usa variables de entorno
-2. **Exige confirmaciones para pagos grandes** - Pon `acceptUnconfirmed: false`
-3. **Crea tus propios validadores** - Añade la lógica de tu negocio
-4. **Usa tiempos de expiración razonables** - Evita ataques de replay
-5. **HTTPS en producción siempre** - Protege los datos de pago en tránsito
+1. **Never commit private keys to git** - Use environment variables
+2. **Require confirmations for large payments** - Set `acceptUnconfirmed: false`
+3. **Create your own validators** - Add your business logic
+4. **Use reasonable expiration times** - Prevent replay attacks
+5. **Always HTTPS in production** - Protect payment data in transit
 
-## ¿Por qué Stacks?
+## Why Stacks?
 
-- **Seguridad de Bitcoin** - Las transacciones se anclan a Bitcoin L1
-- **Smart Contracts** - Lenguaje Clarity para lógica de pago avanzada
-- **Confirmación rápida** - Bloques de ~10 minutos (vs 10+ min en Bitcoin)
-- **Fees bajos** - Costo amigable para micropagos
-- **Tokens nativos** - STX y tokens fungibles SIP-010
+- **Bitcoin Security** - Transactions anchor to Bitcoin L1
+- **Smart Contracts** - Clarity language for advanced payment logic
+- **Fast Confirmation** - ~10 minute blocks (vs 10+ min on Bitcoin)
+- **Low Fees** - Cost-effective for micropayments
+- **Native Tokens** - STX and SIP-010 fungible tokens
 
-## Comparativa
+## Comparison
 
-| Característica | x402-stacks | Tarjetas de crédito | Suscripciones |
-|----------------|-------------|---------------------|---------------|
-| Fees | <$0.01 | $0.30 + 2.9% | Mensual/Anual |
-| Confirmación | ~10 minutos | 1-3 días | Cobro mensual |
-| Chargebacks | No | Sí (120 días) | Sí |
-| Micropagos | Sí | No (mínimo ~$0.50) | No |
-| Para IA | Sí | No | No |
-| Global | Sí | Limitado | Limitado |
+| Feature | x402-stacks | Credit Cards | Subscriptions |
+|---------|-------------|--------------|---------------|
+| Fees | <$0.01 | $0.30 + 2.9% | Monthly/Annual |
+| Confirmation | ~10 minutes | 1-3 days | Monthly billing |
+| Chargebacks | No | Yes (120 days) | Yes |
+| Micropayments | Yes | No (min ~$0.50) | No |
+| For AI | Yes | No | No |
+| Global | Yes | Limited | Limited |
 
-## Licencia
+## License
 
 MIT
 
-## Recursos
+## Resources
 
-- [Especificación del protocolo x402](./x402.MD)
+- [x402 Protocol Specification](./x402.MD)
 - [Stacks Blockchain](https://www.stacks.co/)
-- [Docs de Stacks.js](https://docs.hiro.so/stacks.js)
-- [Explorador de Stacks](https://explorer.stacks.co/)
-- [Faucet Testnet](https://explorer.stacks.co/sandbox/faucet?chain=testnet)
+- [Stacks.js Docs](https://docs.hiro.so/stacks.js)
+- [Stacks Explorer](https://explorer.stacks.co/)
+- [Testnet Faucet](https://explorer.stacks.co/sandbox/faucet?chain=testnet)
 
-## Contribuye
+## Contributing
 
-¡Las contribuciones son bienvenidas! Abre un issue o manda un pull request.
+Contributions are welcome! Open an issue or submit a pull request.
 
-## Soporte
+## Support
 
-Si tienes dudas o necesitas ayuda:
-- Abre un issue en GitHub
-- Revisa los [ejemplos](./examples)
-- Lee la [especificación x402](./x402.MD)
+If you have questions or need help:
+- Open an issue on GitHub
+- Check the [examples](./examples)
+- Read the [x402 specification](./x402.MD)

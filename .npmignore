@@ -1,0 +1,62 @@
+# Source files (not needed in npm package - only dist/ is needed)
+src/
+*.ts
+!*.d.ts
+
+# Examples (keep in repo, exclude from npm package)
+examples/
+
+# Development files
+.env
+.env.local
+.env.*.local
+.env.example
+
+# IDE
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/
+
+# Documentation (keep README.md, exclude others)
+x402.MD
+
+# Tests
+__tests__/
+*.test.ts
+*.spec.ts
+coverage/
+.nyc_output/
+
+# Build artifacts
+*.tsbuildinfo
+tsconfig.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+tmp/
+temp/
+
+# Lock files (package-lock.json should be published, but not others)
+yarn.lock
+pnpm-lock.yaml
