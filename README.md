@@ -393,6 +393,14 @@ The library automatically handles the token type format conversion for the Facil
 
 Note: The library uses `'sBTC'` in your code, but automatically converts to `'SBTC'` (uppercase) when communicating with the Facilitator API.
 
+### Default Facilitator
+
+The library uses the following default facilitator for payment verification:
+
+**Default Facilitator URL**: `https://x402-backend-7eby.onrender.com`
+
+This facilitator handles both STX and sBTC payment verification. You can override this by configuring your own facilitator endpoint if needed.
+
 ### sBTC Utilities
 
 ```typescript
