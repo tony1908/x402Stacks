@@ -38,6 +38,8 @@ export function x402PaymentRequired(config: X402MiddlewareConfig) {
         minAmount: BigInt(config.amount),
         resource: config.resource || req.path,
         method: req.method,
+        tokenType: config.tokenType,
+        tokenContract: config.tokenContract,
       };
 
       const verification = await verifier.verifyPayment(
@@ -119,6 +121,8 @@ function sendPaymentRequired(
     network: config.network,
     nonce,
     expiresAt,
+    tokenType: config.tokenType,
+    tokenContract: config.tokenContract,
   };
 
   res.status(402).json(paymentRequest);

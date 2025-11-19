@@ -10,6 +10,21 @@ import { StacksNetwork } from '@stacks/network';
 export type NetworkType = 'mainnet' | 'testnet';
 
 /**
+ * Token type for payments
+ */
+export type TokenType = 'STX' | 'sBTC';
+
+/**
+ * Token contract configuration
+ */
+export interface TokenContract {
+  /** Contract address */
+  address: string;
+  /** Contract name */
+  name: string;
+}
+
+/**
  * Payment status from transaction verification
  */
 export type PaymentStatus = 'pending' | 'success' | 'failed' | 'not_found';
@@ -18,7 +33,7 @@ export type PaymentStatus = 'pending' | 'success' | 'failed' | 'not_found';
  * HTTP 402 Payment Required response body
  */
 export interface X402PaymentRequired {
-  /** Maximum amount required in microSTX (1 STX = 1,000,000 microSTX) */
+  /** Maximum amount required (microSTX for STX, sats for sBTC) */
   maxAmountRequired: string;
 
   /** Resource being accessed */
@@ -38,6 +53,12 @@ export interface X402PaymentRequired {
 
   /** Optional memo to include in the payment */
   memo?: string;
+
+  /** Token type (defaults to STX) */
+  tokenType?: TokenType;
+
+  /** Token contract info (required for sBTC) */
+  tokenContract?: TokenContract;
 }
 
 /**
@@ -47,7 +68,7 @@ export interface PaymentDetails {
   /** Recipient Stacks address */
   recipient: string;
 
-  /** Amount in microSTX */
+  /** Amount (microSTX for STX, sats for sBTC) */
   amount: bigint;
 
   /** Sender's private key (hex string) */
@@ -64,6 +85,15 @@ export interface PaymentDetails {
 
   /** Optional fee (auto-estimated if not provided) */
   fee?: bigint;
+
+  /** Token type (defaults to STX) */
+  tokenType?: TokenType;
+
+  /** Token contract info (required for sBTC) */
+  tokenContract?: TokenContract;
+
+  /** Sender address (required for sBTC) */
+  senderAddress?: string;
 }
 
 /**
@@ -125,7 +155,7 @@ export interface VerificationOptions {
   /** Expected recipient address */
   expectedRecipient: string;
 
-  /** Minimum amount required in microSTX */
+  /** Minimum amount required (microSTX for STX, sats for sBTC) */
   minAmount: bigint;
 
   /** Expected sender address (optional) */
@@ -142,13 +172,19 @@ export interface VerificationOptions {
 
   /** HTTP method being used (optional, for x402 tracking) */
   method?: string;
+
+  /** Token type (defaults to STX) */
+  tokenType?: TokenType;
+
+  /** Token contract info (required for sBTC) */
+  tokenContract?: TokenContract;
 }
 
 /**
  * Configuration for x402 middleware
  */
 export interface X402MiddlewareConfig {
-  /** Amount required in microSTX */
+  /** Amount required (microSTX for STX, sats for sBTC) */
   amount: string | bigint;
 
   /** Server's Stacks address to receive payments */
@@ -171,6 +207,12 @@ export interface X402MiddlewareConfig {
 
   /** Custom payment validator (optional) */
   paymentValidator?: (payment: VerifiedPayment) => boolean | Promise<boolean>;
+
+  /** Token type (defaults to STX) */
+  tokenType?: TokenType;
+
+  /** Token contract info (required for sBTC) */
+  tokenContract?: TokenContract;
 }
 
 /**
@@ -231,7 +273,7 @@ export interface FacilitatorVerifyRequest {
   /** Expected recipient address */
   expected_recipient: string;
 
-  /** Minimum amount in microSTX */
+  /** Minimum amount (microSTX for STX, sats for sBTC) */
   min_amount: number;
 
   /** Expected sender address (optional) */
@@ -248,6 +290,9 @@ export interface FacilitatorVerifyRequest {
 
   /** HTTP method being used (optional, for x402 tracking) */
   method?: string;
+
+  /** Token type in Facilitator API format: 'STX' or 'SBTC' (uppercase) */
+  token_type?: 'STX' | 'SBTC';
 }
 
 /**

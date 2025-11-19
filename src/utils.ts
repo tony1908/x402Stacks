@@ -5,7 +5,7 @@
 
 import { makeRandomPrivKey, getPublicKey, publicKeyToAddress, AddressVersion } from '@stacks/transactions';
 import { StacksMainnet, StacksTestnet } from '@stacks/network';
-import { NetworkType } from './types';
+import { NetworkType, TokenType, TokenContract } from './types';
 
 /**
  * Convert microSTX to STX
@@ -21,6 +21,22 @@ export function microSTXtoSTX(microSTX: bigint | string): string {
 export function STXtoMicroSTX(stx: number | string): bigint {
   const amount = typeof stx === 'string' ? parseFloat(stx) : stx;
   return BigInt(Math.floor(amount * 1_000_000));
+}
+
+/**
+ * Convert sats to BTC
+ */
+export function satsToBTC(sats: bigint | string): string {
+  const amount = typeof sats === 'string' ? BigInt(sats) : sats;
+  return (Number(amount) / 100_000_000).toFixed(8);
+}
+
+/**
+ * Convert BTC to sats
+ */
+export function BTCtoSats(btc: number | string): bigint {
+  const amount = typeof btc === 'string' ? parseFloat(btc) : btc;
+  return BigInt(Math.floor(amount * 100_000_000));
 }
 
 /**
@@ -86,18 +102,29 @@ export function getExplorerURL(txId: string, network: NetworkType = 'mainnet'): 
  * Format payment amount for display
  */
 export function formatPaymentAmount(
-  microSTX: bigint | string,
+  amount: bigint | string,
   options: {
     includeSymbol?: boolean;
     decimals?: number;
+    tokenType?: TokenType;
   } = {}
 ): string {
-  const { includeSymbol = true, decimals = 6 } = options;
+  const { includeSymbol = true, decimals = 6, tokenType = 'STX' } = options;
 
-  const stx = microSTXtoSTX(microSTX);
-  const amount = parseFloat(stx).toFixed(decimals);
+  let formattedAmount: string;
+  let symbol: string;
 
-  return includeSymbol ? `${amount} STX` : amount;
+  if (tokenType === 'sBTC') {
+    const btc = satsToBTC(amount);
+    formattedAmount = parseFloat(btc).toFixed(decimals);
+    symbol = 'sBTC';
+  } else {
+    const stx = microSTXtoSTX(amount);
+    formattedAmount = parseFloat(stx).toFixed(decimals);
+    symbol = 'STX';
+  }
+
+  return includeSymbol ? `${formattedAmount} ${symbol}` : formattedAmount;
 }
 
 /**
@@ -240,4 +267,44 @@ export function truncateAddress(address: string, chars: number = 6): string {
  */
 export function getNetworkInstance(network: NetworkType) {
   return network === 'mainnet' ? new StacksMainnet() : new StacksTestnet();
+}
+
+/**
+ * Get default sBTC contract for network
+ */
+export function getDefaultSBTCContract(network: NetworkType): TokenContract {
+  if (network === 'mainnet') {
+    // Mainnet sBTC contract (update when mainnet launches)
+    return {
+      address: 'SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9',
+      name: 'token-sbtc',
+    };
+  } else {
+    // Testnet sBTC contract
+    return {
+      address: 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT',
+      name: 'sbtc-token',
+    };
+  }
+}
+
+/**
+ * Get token symbol for display
+ */
+export function getTokenSymbol(tokenType: TokenType): string {
+  return tokenType === 'sBTC' ? 'sBTC' : 'STX';
+}
+
+/**
+ * Get token decimals
+ */
+export function getTokenDecimals(tokenType: TokenType): number {
+  return tokenType === 'sBTC' ? 8 : 6;
+}
+
+/**
+ * Get smallest unit name for token
+ */
+export function getTokenSmallestUnit(tokenType: TokenType): string {
+  return tokenType === 'sBTC' ? 'sats' : 'microSTX';
 }
