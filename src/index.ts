@@ -21,6 +21,8 @@ export {
 export type {
   NetworkType,
   PaymentStatus,
+  TokenType,
+  TokenContract,
   X402PaymentRequired,
   PaymentDetails,
   PaymentResult,
@@ -37,6 +39,8 @@ export type {
 export {
   microSTXtoSTX,
   STXtoMicroSTX,
+  satsToBTC,
+  BTCtoSats,
   generateKeypair,
   isValidStacksAddress,
   getAddressNetwork,
@@ -52,4 +56,8 @@ export {
   createExpirationTimestamp,
   truncateAddress,
   getNetworkInstance,
+  getDefaultSBTCContract,
+  getTokenSymbol,
+  getTokenDecimals,
+  getTokenSmallestUnit,
 } from './utils';

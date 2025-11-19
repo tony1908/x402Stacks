@@ -52,6 +52,8 @@ export class X402PaymentVerifier {
         network: this.network,
         resource: options.resource,
         method: options.method,
+        // Map token type to facilitator API format (STX or SBTC)
+        token_type: options.tokenType === 'sBTC' ? 'SBTC' : 'STX',
       };
 
       // Call facilitator API

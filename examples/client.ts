@@ -194,6 +194,69 @@ async function example5_HighValueRequest() {
   }
 }
 
+/**
+ * Example 6: Manual sBTC payment flow
+ */
+async function example6_SBTCPayment() {
+  console.log('\n--- Example 6: Manual sBTC Payment Flow ---');
+
+  try {
+    // Step 1: Make initial request (will return 402)
+    console.log('Step 1: Making initial request to sBTC-gated endpoint...');
+
+    const response = await fetch(`${SERVER_URL}/api/bitcoin-data`);
+
+    if (response.status === 402) {
+      const paymentRequest = await response.json() as X402PaymentRequired;
+      console.log('Step 2: Received 402 Payment Required (sBTC)');
+      console.log('Payment details:', {
+        amount: formatPaymentAmount(paymentRequest.maxAmountRequired, { tokenType: 'sBTC' }),
+        payTo: paymentRequest.payTo,
+        resource: paymentRequest.resource,
+        tokenType: paymentRequest.tokenType,
+        tokenContract: paymentRequest.tokenContract,
+        expiresAt: paymentRequest.expiresAt,
+      });
+
+      // Step 3: Make sBTC payment
+      console.log('\nStep 3: Making sBTC payment...');
+      const paymentResult = await client.makePayment(paymentRequest);
+
+      if (!paymentResult.success) {
+        throw new Error(`sBTC payment failed: ${paymentResult.error}`);
+      }
+
+      console.log('sBTC payment successful!');
+      console.log('Transaction ID:', paymentResult.txId);
+      console.log('Explorer:', getExplorerURL(paymentResult.txId, NETWORK));
+
+      // Step 4: Retry request with payment proof
+      console.log('\nStep 4: Retrying request with sBTC payment proof...');
+
+      const retryResponse = await fetch(`${SERVER_URL}/api/bitcoin-data`, {
+        headers: {
+          'X-Payment-TxId': paymentResult.txId,
+        },
+      });
+
+      if (retryResponse.ok) {
+        const data: any = await retryResponse.json();
+        console.log('Success! Received Bitcoin data:', data.data);
+        console.log('Payment info:', {
+          txId: data.payment.txId,
+          amount: data.payment.amount,
+          tokenType: data.payment.tokenType,
+          sender: data.payment.sender,
+        });
+      } else {
+        console.error('Retry failed:', await retryResponse.text());
+      }
+    }
+  } catch (error) {
+    console.error('Error:', error instanceof Error ? error.message : error);
+  }
+}
+
 // Main execution
 async function main() {
   console.log('='.repeat(60));
@@ -219,8 +282,9 @@ async function main() {
   // await example1_SimplePaidRequest();
   // await example2_TieredPricing();
   // await example3_RateLimiting();
-  await example4_ManualPayment();
+  //await example4_ManualPayment();
   // await example5_HighValueRequest();
+  await example6_SBTCPayment();
 
   console.log('\n' + '='.repeat(60));
   console.log('Examples completed');

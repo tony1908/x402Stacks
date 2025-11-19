@@ -11,6 +11,8 @@ import {
   paymentRateLimit,
   getPayment,
   STXtoMicroSTX,
+  BTCtoSats,
+  getDefaultSBTCContract,
 } from '../src';
 
 const app = express();
@@ -26,7 +28,7 @@ const FACILITATOR_URL = process.env.FACILITATOR_URL || 'http://localhost:8085';
 app.get(
   '/api/premium-data',
   x402PaymentRequired({
-    amount: STXtoMicroSTX(0.001), // 0.1 STX
+    amount: STXtoMicroSTX(0.001), // 0.001 STX
     address: SERVER_ADDRESS,
     network: NETWORK,
     facilitatorUrl: FACILITATOR_URL,
@@ -178,6 +180,38 @@ app.post(
   }
 );
 
+// Example 5: sBTC payment endpoint
+app.get(
+  '/api/bitcoin-data',
+  x402PaymentRequired({
+    amount: BTCtoSats(0.00001), // 0.00001 BTC (1000 sats)
+    address: SERVER_ADDRESS,
+    network: NETWORK,
+    facilitatorUrl: FACILITATOR_URL,
+    tokenType: 'sBTC',
+    tokenContract: getDefaultSBTCContract(NETWORK),
+  }),
+  (req: Request, res: Response) => {
+    const payment = getPayment(req);
+
+    res.json({
+      success: true,
+      data: {
+        bitcoinInfo: 'Bitcoin-related premium data',
+        blockHeight: 800000,
+        hashRate: '400 EH/s',
+        timestamp: new Date().toISOString(),
+      },
+      payment: {
+        txId: payment.txId,
+        amount: payment.amount.toString(),
+        sender: payment.sender,
+        tokenType: 'sBTC',
+      },
+    });
+  }
+);
+
 // Health check endpoint (no payment required)
 app.get('/health', (req: Request, res: Response) => {
   res.json({
@@ -195,10 +229,11 @@ app.listen(PORT, () => {
   console.log(`Facilitator URL: ${FACILITATOR_URL}`);
   console.log('\nAvailable endpoints:');
   console.log('  GET  /health - Health check (free)');
-  console.log('  GET  /api/premium-data - Premium data (0.1 STX, confirmed)');
+  console.log('  GET  /api/premium-data - Premium data (0.001 STX, confirmed)');
   console.log('  GET  /api/market-data?type=basic|standard|premium - Market data (tiered pricing, confirmed)');
   console.log('  GET  /api/search?q=query - Search (10 free/hour, then 0.02 STX, confirmed)');
   console.log('  POST /api/compute - Compute task (0.5 STX, confirmed)');
+  console.log('  GET  /api/bitcoin-data - Bitcoin data (0.00001 BTC / 1000 sats in sBTC, confirmed)');
 });
 
 export default app;
