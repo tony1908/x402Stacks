@@ -1,19 +1,23 @@
 /**
  * x402-stacks - Express Middleware
  * Middleware for handling x402 payment requirements in Express.js applications
+ * Uses the x402 facilitator pattern: client signs, server settles
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { X402PaymentVerifier } from './verifier';
+import { X402PaymentVerifier, SettleOptions } from './verifier';
 import {
   X402MiddlewareConfig,
   X402PaymentRequired,
-  VerificationOptions,
 } from './types';
 import { randomBytes } from 'crypto';
 
 /**
  * Express middleware for x402 payment requirements
+ * Uses the x402 facilitator pattern:
+ * 1. Client sends signed transaction in X-PAYMENT header
+ * 2. Server calls facilitator /settle endpoint to broadcast and confirm
+ * 3. Server grants access after payment is confirmed
  */
 export function x402PaymentRequired(config: X402MiddlewareConfig) {
   const facilitatorUrl = config.facilitatorUrl || 'http://localhost:8085';
@@ -21,31 +25,47 @@ export function x402PaymentRequired(config: X402MiddlewareConfig) {
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Check for payment transaction ID in headers or query
-      const paymentTxId =
-        req.headers['x-payment-txid'] as string ||
+      // Check for signed payment in X-PAYMENT header (x402 facilitator pattern)
+      // Also support legacy x-payment-txid for backwards compatibility
+      const signedPayment = req.headers['x-payment'] as string;
+      const legacyTxId = req.headers['x-payment-txid'] as string ||
         req.query.paymentTxId as string ||
         req.body?.paymentTxId;
 
       // If no payment provided, return 402 Payment Required
-      if (!paymentTxId) {
+      if (!signedPayment && !legacyTxId) {
         return sendPaymentRequired(req, res, config);
       }
 
-      // Verify the payment (always requires confirmation)
-      const verificationOptions: VerificationOptions = {
-        expectedRecipient: config.address,
-        minAmount: BigInt(config.amount),
-        resource: config.resource || req.path,
-        method: req.method,
-        tokenType: config.tokenType,
-        tokenContract: config.tokenContract,
-      };
+      // Determine token type from header or config
+      const tokenType = (req.headers['x-payment-token-type'] as string)?.toLowerCase() === 'sbtc'
+        ? 'sBTC'
+        : config.tokenType || 'STX';
 
-      const verification = await verifier.verifyPayment(
-        paymentTxId,
-        verificationOptions
-      );
+      let verification;
+
+      if (signedPayment) {
+        // New x402 facilitator pattern: settle the signed transaction
+        const settleOptions: SettleOptions = {
+          expectedRecipient: config.address,
+          minAmount: BigInt(config.amount),
+          tokenType,
+          resource: config.resource || req.path,
+          method: req.method,
+        };
+
+        verification = await verifier.settlePayment(signedPayment, settleOptions);
+      } else {
+        // Legacy flow: verify existing transaction by ID
+        verification = await verifier.verifyPayment(legacyTxId, {
+          expectedRecipient: config.address,
+          minAmount: BigInt(config.amount),
+          resource: config.resource || req.path,
+          method: req.method,
+          tokenType: config.tokenType,
+          tokenContract: config.tokenContract,
+        });
+      }
 
       // Check if payment is valid
       if (!verification.isValid) {
@@ -86,11 +106,20 @@ export function x402PaymentRequired(config: X402MiddlewareConfig) {
 
       // Payment is valid, attach payment info to request and continue
       (req as any).payment = verification;
+
+      // Add X-PAYMENT-RESPONSE header with settlement info (per x402 spec)
+      const paymentResponse = {
+        txId: verification.txId,
+        status: verification.status,
+        blockHeight: verification.blockHeight,
+      };
+      res.setHeader('X-PAYMENT-RESPONSE', Buffer.from(JSON.stringify(paymentResponse)).toString('base64'));
+
       next();
     } catch (error) {
       console.error('x402 middleware error:', error);
       return res.status(500).json({
-        error: 'Payment verification error',
+        error: 'Payment settlement error',
         details: error instanceof Error ? error.message : 'Unknown error',
       });
     }

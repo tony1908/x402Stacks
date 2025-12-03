@@ -3,9 +3,20 @@
  * TypeScript library for implementing x402 payment protocol on Stacks blockchain
  */
 
-// Core components
+// x402 Client (axios interceptor pattern - recommended)
+export {
+  withPaymentInterceptor,
+  createPaymentClient,
+  privateKeyToAccount,
+  decodeXPaymentResponse,
+  encodeXPaymentResponse,
+} from './interceptor';
+
+// Legacy client (class-based)
 export { X402PaymentClient } from './client';
-export { X402PaymentVerifier } from './verifier';
+
+// Server components
+export { X402PaymentVerifier, SettleOptions } from './verifier';
 
 // Middleware
 export {
@@ -26,6 +37,7 @@ export type {
   X402PaymentRequired,
   PaymentDetails,
   PaymentResult,
+  SignedPaymentResult,
   VerifiedPayment,
   VerificationOptions,
   X402MiddlewareConfig,
@@ -33,6 +45,10 @@ export type {
   X402ClientConfig,
   FacilitatorVerifyRequest,
   FacilitatorVerifyResponse,
+  FacilitatorSettleRequest,
+  FacilitatorSettleResponse,
+  StacksAccount,
+  PaymentResponse,
 } from './types';
 
 // Utilities
