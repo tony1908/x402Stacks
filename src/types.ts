@@ -344,3 +344,121 @@ export interface FacilitatorVerifyResponse {
   /** Error message */
   error?: string;
 }
+
+/**
+ * Facilitator API request for payment settlement (x402 facilitator pattern)
+ */
+export interface FacilitatorSettleRequest {
+  /** Hex-encoded signed transaction (with or without 0x prefix) */
+  signed_transaction: string;
+
+  /** Token type: 'STX' or 'SBTC' */
+  token_type?: 'STX' | 'SBTC';
+
+  /** Expected recipient address */
+  expected_recipient: string;
+
+  /** Minimum amount in base units (microSTX or satoshis) */
+  min_amount: number;
+
+  /** Expected sender address (optional) */
+  expected_sender?: string;
+
+  /** Network type */
+  network: NetworkType;
+
+  /** API resource being accessed (optional, for tracking) */
+  resource?: string;
+
+  /** HTTP method being used (optional, for tracking) */
+  method?: string;
+}
+
+/**
+ * Facilitator API response for payment settlement
+ */
+export interface FacilitatorSettleResponse {
+  /** Whether settlement was successful */
+  success: boolean;
+
+  /** Transaction ID */
+  tx_id?: string;
+
+  /** Token type */
+  token_type?: string;
+
+  /** Sender address */
+  sender_address?: string;
+
+  /** Recipient address */
+  recipient_address?: string;
+
+  /** Amount transferred */
+  amount?: number;
+
+  /** Transaction fee */
+  fee?: number;
+
+  /** Transaction status */
+  status?: string;
+
+  /** Block height (if confirmed) */
+  block_height?: number;
+
+  /** Network */
+  network?: string;
+
+  /** Validation errors if failed */
+  validation_errors?: string[];
+
+  /** Error message */
+  error?: string;
+}
+
+/**
+ * Result of signing a payment transaction (without broadcasting)
+ */
+export interface SignedPaymentResult {
+  /** Hex-encoded signed transaction */
+  signedTransaction: string;
+
+  /** Whether signing was successful */
+  success: boolean;
+
+  /** Sender address */
+  senderAddress?: string;
+
+  /** Error message if failed */
+  error?: string;
+}
+
+/**
+ * Stacks account for signing transactions (similar to viem's account pattern)
+ */
+export interface StacksAccount {
+  /** Stacks address */
+  address: string;
+
+  /** Private key (hex string) */
+  privateKey: string;
+
+  /** Network type */
+  network: NetworkType;
+}
+
+/**
+ * Decoded X-PAYMENT-RESPONSE header
+ */
+export interface PaymentResponse {
+  /** Transaction ID */
+  txId: string;
+
+  /** Payment status */
+  status: string;
+
+  /** Block height (if confirmed) */
+  blockHeight?: number;
+
+  /** Any additional fields from the response */
+  [key: string]: unknown;
+}

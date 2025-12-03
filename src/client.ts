@@ -23,6 +23,7 @@ import axios, { AxiosInstance } from 'axios';
 import {
   PaymentDetails,
   PaymentResult,
+  SignedPaymentResult,
   X402PaymentRequired,
   X402ClientConfig,
   NetworkType,
@@ -57,7 +58,41 @@ export class X402PaymentClient {
   }
 
   /**
-   * Make a payment based on x402 payment request
+   * Sign a payment based on x402 payment request (without broadcasting)
+   * Returns the signed transaction hex to be sent to the facilitator
+   */
+  async signPayment(paymentRequest: X402PaymentRequired): Promise<SignedPaymentResult> {
+    try {
+      const amount = BigInt(paymentRequest.maxAmountRequired);
+      const tokenType = paymentRequest.tokenType || 'STX';
+
+      const paymentDetails: PaymentDetails = {
+        recipient: paymentRequest.payTo,
+        amount,
+        senderKey: this.privateKey,
+        network: paymentRequest.network,
+        memo: paymentRequest.nonce.substring(0, 34), // Max 34 bytes for Stacks memo
+        tokenType,
+        tokenContract: paymentRequest.tokenContract,
+      };
+
+      if (tokenType === 'sBTC') {
+        return await this.signSBTCTransfer(paymentDetails);
+      } else {
+        return await this.signSTXTransfer(paymentDetails);
+      }
+    } catch (error) {
+      return {
+        signedTransaction: '',
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Make a payment based on x402 payment request (broadcasts directly)
+   * @deprecated Use signPayment() with facilitator settle endpoint instead
    */
   async makePayment(paymentRequest: X402PaymentRequired): Promise<PaymentResult> {
     try {
@@ -90,6 +125,119 @@ export class X402PaymentClient {
   }
 
   /**
+   * Sign STX token transfer (without broadcasting)
+   */
+  async signSTXTransfer(details: PaymentDetails): Promise<SignedPaymentResult> {
+    try {
+      // Determine network
+      const network =
+        typeof details.network === 'string'
+          ? this.getNetworkInstance(details.network)
+          : details.network;
+
+      // Get sender address from private key
+      const senderAddress = getAddressFromPrivateKey(
+        details.senderKey,
+        network instanceof StacksMainnet ? TransactionVersion.Mainnet : TransactionVersion.Testnet
+      );
+
+      // Build transaction options
+      const txOptions = {
+        recipient: details.recipient,
+        amount: details.amount,
+        senderKey: this.privateKey,
+        network,
+        memo: details.memo || '',
+        anchorMode: AnchorMode.Any,
+        ...(details.nonce !== undefined && { nonce: details.nonce }),
+        ...(details.fee !== undefined && { fee: details.fee }),
+      };
+
+      // Create transaction (signed but not broadcast)
+      const transaction = await makeSTXTokenTransfer(txOptions);
+
+      // Return the signed transaction hex
+      const serialized = transaction.serialize();
+      return {
+        signedTransaction: Buffer.from(serialized).toString('hex'),
+        success: true,
+        senderAddress,
+      };
+    } catch (error) {
+      return {
+        signedTransaction: '',
+        success: false,
+        error: error instanceof Error ? error.message : 'Transaction signing failed',
+      };
+    }
+  }
+
+  /**
+   * Sign sBTC token transfer (without broadcasting)
+   */
+  async signSBTCTransfer(details: PaymentDetails): Promise<SignedPaymentResult> {
+    try {
+      // Determine network
+      const network =
+        typeof details.network === 'string'
+          ? this.getNetworkInstance(details.network)
+          : details.network;
+
+      // Get sender address from private key
+      const senderAddress = getAddressFromPrivateKey(
+        details.senderKey,
+        network instanceof StacksMainnet ? TransactionVersion.Mainnet : TransactionVersion.Testnet
+      );
+
+      // Validate token contract
+      if (!details.tokenContract) {
+        throw new Error('Token contract required for sBTC transfers');
+      }
+
+      const { address: contractAddress, name: contractName } = details.tokenContract;
+
+      // Build function arguments for SIP-010 transfer
+      const functionArgs = [
+        uintCV(details.amount.toString()),
+        principalCV(senderAddress),
+        principalCV(details.recipient),
+        details.memo ? someCV(bufferCVFromString(details.memo)) : noneCV(),
+      ];
+
+      // Build transaction options
+      const txOptions = {
+        contractAddress,
+        contractName,
+        functionName: 'transfer',
+        functionArgs,
+        senderKey: this.privateKey,
+        network,
+        anchorMode: AnchorMode.Any,
+        postConditionMode: PostConditionMode.Allow,
+        ...(details.nonce !== undefined && { nonce: details.nonce }),
+        ...(details.fee !== undefined && { fee: details.fee }),
+      };
+
+      // Create transaction (signed but not broadcast)
+      const transaction = await makeContractCall(txOptions);
+
+      // Return the signed transaction hex
+      const serialized = transaction.serialize();
+      return {
+        signedTransaction: Buffer.from(serialized).toString('hex'),
+        success: true,
+        senderAddress,
+      };
+    } catch (error) {
+      return {
+        signedTransaction: '',
+        success: false,
+        error: error instanceof Error ? error.message : 'sBTC signing failed',
+      };
+    }
+  }
+
+  /**
    * Send STX token transfer
    */
   async sendSTXTransfer(details: PaymentDetails): Promise<PaymentResult> {
@@ -108,7 +256,6 @@ export class X402PaymentClient {
         network,
         memo: details.memo || '',
         anchorMode: AnchorMode.Any,
-        postConditionMode: PostConditionMode.Allow,
         ...(details.nonce !== undefined && { nonce: details.nonce }),
         ...(details.fee !== undefined && { fee: details.fee }),
       };
@@ -123,10 +270,11 @@ export class X402PaymentClient {
       );
 
       // Check for errors in broadcast response
+      const txRaw = Buffer.from(transaction.serialize()).toString('hex');
       if ('error' in broadcastResponse) {
         return {
           txId: '',
-          txRaw: transaction.serialize().toString(),
+          txRaw,
           success: false,
           error: broadcastResponse.error,
         };
@@ -134,7 +282,7 @@ export class X402PaymentClient {
 
       return {
         txId: broadcastResponse.txid,
-        txRaw: transaction.serialize().toString(),
+        txRaw,
         success: true,
       };
     } catch (error) {
@@ -204,10 +352,11 @@ export class X402PaymentClient {
       );
 
       // Check for errors in broadcast response
+      const txRaw = Buffer.from(transaction.serialize()).toString('hex');
       if ('error' in broadcastResponse) {
         return {
           txId: '',
-          txRaw: transaction.serialize().toString(),
+          txRaw,
           success: false,
           error: broadcastResponse.error,
         };
@@ -215,7 +364,7 @@ export class X402PaymentClient {
 
       return {
         txId: broadcastResponse.txid,
-        txRaw: transaction.serialize().toString(),
+        txRaw,
         success: true,
       };
     } catch (error) {
@@ -230,6 +379,7 @@ export class X402PaymentClient {
 
   /**
    * Make an API request with automatic x402 payment handling
+   * Uses the x402 facilitator pattern: client signs, server settles
    */
   async requestWithPayment<T = any>(
     url: string,
@@ -243,15 +393,18 @@ export class X402PaymentClient {
     const { method = 'GET', data, headers = {}, maxRetries = 1 } = options;
 
     let attempt = 0;
-    let lastPaymentTxId: string | undefined;
+    let lastSignedPayment: string | undefined;
+    let lastPaymentRequest: X402PaymentRequired | undefined;
 
     while (attempt <= maxRetries) {
       try {
         const requestHeaders = { ...headers };
 
-        // Include payment transaction ID if we made a payment
-        if (lastPaymentTxId) {
-          requestHeaders['X-Payment-TxId'] = lastPaymentTxId;
+        // Include signed payment if we have one
+        if (lastSignedPayment && lastPaymentRequest) {
+          requestHeaders['X-PAYMENT'] = lastSignedPayment;
+          // Also include payment metadata for the server
+          requestHeaders['X-PAYMENT-TOKEN-TYPE'] = lastPaymentRequest.tokenType || 'STX';
         }
 
         const response = await this.httpClient.request({
@@ -278,20 +431,18 @@ export class X402PaymentClient {
             throw new Error('Payment request has expired');
           }
 
-          // Make payment
-          const paymentResult = await this.makePayment(paymentRequest);
+          // Sign payment (don't broadcast - server will do that via facilitator)
+          const signResult = await this.signPayment(paymentRequest);
 
-          if (!paymentResult.success) {
-            throw new Error(`Payment failed: ${paymentResult.error}`);
+          if (!signResult.success) {
+            throw new Error(`Payment signing failed: ${signResult.error}`);
           }
 
-          lastPaymentTxId = paymentResult.txId;
+          lastSignedPayment = signResult.signedTransaction;
+          lastPaymentRequest = paymentRequest;
           attempt++;
 
-          // Wait a bit before retrying to allow transaction to propagate
-          await this.delay(2000);
-
-          // Continue to next iteration to retry the request
+          // No need to wait - server will broadcast and wait for confirmation
           continue;
         }
 

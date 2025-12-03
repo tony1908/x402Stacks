@@ -1,71 +1,89 @@
 /**
  * Example: x402-stacks Client Implementation
- * Client for making requests to x402-enabled APIs
+ * Demonstrates the x402-axios style API for automatic payment handling
  */
 
 import 'dotenv/config';
-import { X402PaymentClient, generateKeypair, formatPaymentAmount, getExplorerURL, X402PaymentRequired } from '../src';
+import axios from 'axios';
+import {
+  withPaymentInterceptor,
+  privateKeyToAccount,
+  decodeXPaymentResponse,
+  generateKeypair,
+  formatPaymentAmount,
+  getExplorerURL,
+  X402PaymentRequired,
+  StacksAccount,
+} from '../src';
 
 // Configuration
 const NETWORK = (process.env.NETWORK as 'mainnet' | 'testnet') || 'testnet';
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3003';
 
-// Load private key from environment, or generate a new one
-let privateKey: string;
-let address: string;
+// Load or generate account
+let account: StacksAccount;
 
 if (process.env.CLIENT_PRIVATE_KEY) {
   // Use existing private key from .env
-  privateKey = process.env.CLIENT_PRIVATE_KEY;
-  address = process.env.CLIENT_ADDRESS || 'Unknown (add CLIENT_ADDRESS to .env)';
+  account = privateKeyToAccount(process.env.CLIENT_PRIVATE_KEY, NETWORK);
   console.log('Using existing wallet from .env:');
-  console.log('address: ', address);
+  console.log('Address:', account.address);
 } else {
   // Generate a new keypair for first-time setup
   const keypair = generateKeypair(NETWORK);
-  privateKey = keypair.privateKey;
-  address = keypair.address;
 
   console.log('\n' + '='.repeat(70));
-  console.log('⚠️  NO PRIVATE KEY FOUND IN .ENV - GENERATED NEW WALLET');
+  console.log('NO PRIVATE KEY FOUND IN .ENV - GENERATED NEW WALLET');
   console.log('='.repeat(70));
-  console.log('\n📝 To reuse this wallet, add these to your .env file:\n');
+  console.log('\nTo reuse this wallet, add these to your .env file:\n');
   console.log(`CLIENT_PRIVATE_KEY=${keypair.privateKey}`);
   console.log(`CLIENT_ADDRESS=${keypair.address}`);
-  console.log('\n💰 Fund this address with testnet STX:');
+  console.log('\nFund this address with testnet STX:');
   console.log('https://explorer.stacks.co/sandbox/faucet?chain=testnet');
   console.log('\nAddress:', keypair.address);
   console.log('='.repeat(70) + '\n');
+
+  account = privateKeyToAccount(keypair.privateKey, NETWORK);
 }
 
-// Create payment client
-const client = new X402PaymentClient({
-  network: NETWORK,
-  privateKey,
-});
+// Create axios instance with automatic payment handling (x402-axios pattern)
+const api = withPaymentInterceptor(
+  axios.create({
+    baseURL: SERVER_URL,
+    timeout: 60000, // 60 seconds - settlement can take time
+  }),
+  account
+);
 
 /**
- * Example 1: Simple payment request
+ * Example 1: Simple paid request using interceptor (automatic payment)
+ * This is the recommended pattern - just use axios normally
  */
-async function example1_SimplePaidRequest() {
-  console.log('\n--- Example 1: Simple Paid Request ---');
+async function example1_AutomaticPayment() {
+  console.log('\n--- Example 1: Automatic Payment (x402-axios style) ---');
 
   try {
-    const data = await client.requestWithPayment(`${SERVER_URL}/api/premium-data`, {
-      method: 'GET',
-    });
+    // Just make a normal request - payment is handled automatically!
+    const response = await api.get('/api/premium-data');
 
-    console.log('Success! Received data:', data);
-  } catch (error) {
-    console.error('Error:', error instanceof Error ? error.message : error);
+    console.log('Success! Received data:', response.data);
+
+    // Decode the payment response header
+    const paymentResponse = decodeXPaymentResponse(response.headers['x-payment-response']);
+    if (paymentResponse) {
+      console.log('Payment response:', paymentResponse);
+      console.log('Explorer:', getExplorerURL(paymentResponse.txId, NETWORK));
+    }
+  } catch (error: any) {
+    console.error('Error:', error.response?.data?.error || error.message);
   }
 }
 
 /**
- * Example 2: Tiered pricing request
+ * Example 2: Tiered pricing with automatic payment
  */
 async function example2_TieredPricing() {
-  console.log('\n--- Example 2: Tiered Pricing ---');
+  console.log('\n--- Example 2: Tiered Pricing (automatic payment) ---');
 
   const dataTypes = ['basic', 'standard', 'premium'];
 
@@ -73,19 +91,16 @@ async function example2_TieredPricing() {
     try {
       console.log(`\nRequesting ${type} data...`);
 
-      const data = await client.requestWithPayment(
-        `${SERVER_URL}/api/market-data?type=${type}`,
-        {
-          method: 'GET',
-        }
-      );
+      const response = await api.get(`/api/market-data?type=${type}`);
 
-      console.log(`Success! ${type} data:`, data.marketData);
-      if (data.payment) {
-        console.log(`Payment: ${formatPaymentAmount(data.payment.amount)}`);
+      console.log(`Success! ${type} data:`, response.data.marketData);
+
+      const paymentResponse = decodeXPaymentResponse(response.headers['x-payment-response']);
+      if (paymentResponse) {
+        console.log(`Payment txId: ${paymentResponse.txId}`);
       }
-    } catch (error) {
-      console.error(`Error for ${type}:`, error instanceof Error ? error.message : error);
+    } catch (error: any) {
+      console.error(`Error for ${type}:`, error.response?.data?.error || error.message);
     }
   }
 }
@@ -94,197 +109,137 @@ async function example2_TieredPricing() {
  * Example 3: Rate-limited endpoint
  */
 async function example3_RateLimiting() {
-  console.log('\n--- Example 3: Rate Limiting ---');
+  console.log('\n--- Example 3: Rate Limiting (10 free, then paid) ---');
 
   console.log('Making 12 requests (first 10 free, then payment required)...\n');
 
   for (let i = 1; i <= 12; i++) {
     try {
-      const data = await client.requestWithPayment(
-        `${SERVER_URL}/api/search?q=test${i}`,
-        {
-          method: 'GET',
-        }
-      );
+      const response = await api.get(`/api/search?q=test${i}`);
 
-      if (data.payment) {
-        console.log(`Request ${i}: PAID - ${formatPaymentAmount(data.payment.amount)}`);
+      const paymentResponse = decodeXPaymentResponse(response.headers['x-payment-response']);
+      if (paymentResponse) {
+        console.log(`Request ${i}: PAID - txId: ${paymentResponse.txId.slice(0, 20)}...`);
       } else {
         console.log(`Request ${i}: FREE`);
       }
-    } catch (error) {
-      console.error(`Request ${i} error:`, error instanceof Error ? error.message : error);
+    } catch (error: any) {
+      console.error(`Request ${i} error:`, error.response?.data?.error || error.message);
     }
   }
 }
 
 /**
- * Example 4: Manual payment flow (without automatic handling)
+ * Example 4: Manual payment flow (for understanding the protocol)
+ * Shows what happens under the hood
  */
-async function example4_ManualPayment() {
-  console.log('\n--- Example 4: Manual Payment Flow ---');
+async function example4_ManualPaymentFlow() {
+  console.log('\n--- Example 4: Manual Payment Flow (for learning) ---');
 
   try {
-    // Step 1: Make initial request (will return 402)
-    console.log('Step 1: Making initial request...');
+    // Step 1: Make request without payment interceptor
+    const plainAxios = axios.create({ baseURL: SERVER_URL });
 
-    const response = await fetch(`${SERVER_URL}/api/premium-data`);
+    console.log('Step 1: Making request without payment...');
+    const response = await plainAxios.get('/api/premium-data').catch(e => e.response);
 
     if (response.status === 402) {
-      const paymentRequest = await response.json() as X402PaymentRequired;
+      const paymentRequest: X402PaymentRequired = response.data;
       console.log('Step 2: Received 402 Payment Required');
       console.log('Payment details:', {
         amount: formatPaymentAmount(paymentRequest.maxAmountRequired),
         payTo: paymentRequest.payTo,
         resource: paymentRequest.resource,
         expiresAt: paymentRequest.expiresAt,
+        nonce: paymentRequest.nonce.slice(0, 16) + '...',
       });
 
-      // Step 3: Make payment
-      console.log('\nStep 3: Making payment...');
-      const paymentResult = await client.makePayment(paymentRequest);
+      // Step 3: Use interceptor-wrapped client
+      console.log('\nStep 3: Using withPaymentInterceptor to handle payment...');
+      const paidResponse = await api.get('/api/premium-data');
 
-      if (!paymentResult.success) {
-        throw new Error(`Payment failed: ${paymentResult.error}`);
-      }
+      console.log('Step 4: Success! Received data:', paidResponse.data);
 
-      console.log('Payment successful!');
-      console.log('Transaction ID:', paymentResult.txId);
-      console.log('Explorer:', getExplorerURL(paymentResult.txId, NETWORK));
-
-      // Step 4: Retry request with payment proof
-      console.log('\nStep 4: Retrying request with payment proof...');
-
-      const retryResponse = await fetch(`${SERVER_URL}/api/premium-data`, {
-        headers: {
-          'X-Payment-TxId': paymentResult.txId,
-        },
-      });
-
-      if (retryResponse.ok) {
-        const data = await retryResponse.json();
-        console.log('Success! Received data:', data);
-      } else {
-        console.error('Retry failed:', await retryResponse.text());
+      const paymentResponse = decodeXPaymentResponse(paidResponse.headers['x-payment-response']);
+      if (paymentResponse) {
+        console.log('Payment confirmed:', paymentResponse);
+        console.log('Explorer:', getExplorerURL(paymentResponse.txId, NETWORK));
       }
     }
-  } catch (error) {
-    console.error('Error:', error instanceof Error ? error.message : error);
+  } catch (error: any) {
+    console.error('Error:', error.response?.data?.error || error.message);
   }
 }
 
 /**
- * Example 5: High-value request with confirmation required
+ * Example 5: sBTC payment (automatic)
  */
-async function example5_HighValueRequest() {
-  console.log('\n--- Example 5: High-Value Request (Requires Confirmation) ---');
+async function example5_SBTCPayment() {
+  console.log('\n--- Example 5: sBTC Payment (automatic) ---');
 
   try {
-    const data = await client.requestWithPayment(`${SERVER_URL}/api/compute`, {
-      method: 'POST',
-      data: {
-        task: 'complex-calculation',
-      },
+    const response = await api.get('/api/bitcoin-data');
+
+    console.log('Success! Received Bitcoin data:', response.data.data);
+
+    const paymentResponse = decodeXPaymentResponse(response.headers['x-payment-response']);
+    if (paymentResponse) {
+      console.log('sBTC Payment response:', paymentResponse);
+      console.log('Explorer:', getExplorerURL(paymentResponse.txId, NETWORK));
+    }
+  } catch (error: any) {
+    console.error('Error:', error.response?.data?.error || error.message);
+  }
+}
+
+/**
+ * Example 6: POST request with payment
+ */
+async function example6_PostRequest() {
+  console.log('\n--- Example 6: POST Request with Payment ---');
+
+  try {
+    const response = await api.post('/api/compute', {
+      task: 'complex-calculation',
     });
 
-    console.log('Success! Computation result:', data.result);
-    console.log('Payment confirmed in block:', data.payment.confirmedInBlock);
-  } catch (error) {
-    console.error('Error:', error instanceof Error ? error.message : error);
-  }
-}
+    console.log('Success! Computation result:', response.data.result);
 
-/**
- * Example 6: Manual sBTC payment flow
- */
-async function example6_SBTCPayment() {
-  console.log('\n--- Example 6: Manual sBTC Payment Flow ---');
-
-  try {
-    // Step 1: Make initial request (will return 402)
-    console.log('Step 1: Making initial request to sBTC-gated endpoint...');
-
-    const response = await fetch(`${SERVER_URL}/api/bitcoin-data`);
-
-    if (response.status === 402) {
-      const paymentRequest = await response.json() as X402PaymentRequired;
-      console.log('Step 2: Received 402 Payment Required (sBTC)');
-      console.log('Payment details:', {
-        amount: formatPaymentAmount(paymentRequest.maxAmountRequired, { tokenType: 'sBTC' }),
-        payTo: paymentRequest.payTo,
-        resource: paymentRequest.resource,
-        tokenType: paymentRequest.tokenType,
-        tokenContract: paymentRequest.tokenContract,
-        expiresAt: paymentRequest.expiresAt,
-      });
-
-      // Step 3: Make sBTC payment
-      console.log('\nStep 3: Making sBTC payment...');
-      const paymentResult = await client.makePayment(paymentRequest);
-
-      if (!paymentResult.success) {
-        throw new Error(`sBTC payment failed: ${paymentResult.error}`);
-      }
-
-      console.log('sBTC payment successful!');
-      console.log('Transaction ID:', paymentResult.txId);
-      console.log('Explorer:', getExplorerURL(paymentResult.txId, NETWORK));
-
-      // Step 4: Retry request with payment proof
-      console.log('\nStep 4: Retrying request with sBTC payment proof...');
-
-      const retryResponse = await fetch(`${SERVER_URL}/api/bitcoin-data`, {
-        headers: {
-          'X-Payment-TxId': paymentResult.txId,
-        },
-      });
-
-      if (retryResponse.ok) {
-        const data: any = await retryResponse.json();
-        console.log('Success! Received Bitcoin data:', data.data);
-        console.log('Payment info:', {
-          txId: data.payment.txId,
-          amount: data.payment.amount,
-          tokenType: data.payment.tokenType,
-          sender: data.payment.sender,
-        });
-      } else {
-        console.error('Retry failed:', await retryResponse.text());
-      }
+    const paymentResponse = decodeXPaymentResponse(response.headers['x-payment-response']);
+    if (paymentResponse) {
+      console.log('Payment confirmed in block:', paymentResponse.blockHeight);
     }
-  } catch (error) {
-    console.error('Error:', error instanceof Error ? error.message : error);
+  } catch (error: any) {
+    console.error('Error:', error.response?.data?.error || error.message);
   }
 }
 
 // Main execution
 async function main() {
   console.log('='.repeat(60));
-  console.log('x402-stacks Client Examples');
+  console.log('x402-stacks Client Examples (x402-axios style)');
   console.log('='.repeat(60));
 
   // Check if server is running
   try {
-    const healthResponse = await fetch(`${SERVER_URL}/health`);
-    if (!healthResponse.ok) {
+    const healthResponse = await axios.get(`${SERVER_URL}/health`);
+    if (healthResponse.status !== 200) {
       throw new Error('Server not responding');
     }
-    console.log('✓ Server is running');
-  } catch (error) {
-    console.error('✗ Server is not running. Please start the server first:');
+    console.log('Server is running');
+  } catch {
+    console.error('Server is not running. Please start the server first:');
     console.error('  npm run dev:server');
     return;
   }
 
-  // Run examples
-  // Uncomment the examples you want to run
-
-  // await example1_SimplePaidRequest();
+  // Run examples - uncomment the ones you want to test
+  await example1_AutomaticPayment();
   // await example2_TieredPricing();
   // await example3_RateLimiting();
-  //await example4_ManualPayment();
-  // await example5_HighValueRequest();
-  await example6_SBTCPayment();
+  // await example4_ManualPaymentFlow();
+  // await example5_SBTCPayment();
+  // await example6_PostRequest();
 
   console.log('\n' + '='.repeat(60));
   console.log('Examples completed');
