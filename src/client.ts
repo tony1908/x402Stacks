@@ -78,6 +78,8 @@ export class X402PaymentClient {
 
       if (tokenType === 'sBTC') {
         return await this.signSBTCTransfer(paymentDetails);
+      } else if (tokenType === 'USDCx') {
+        return await this.signUSDCxTransfer(paymentDetails);
       } else {
         return await this.signSTXTransfer(paymentDetails);
       }
@@ -111,6 +113,8 @@ export class X402PaymentClient {
 
       if (tokenType === 'sBTC') {
         return await this.sendSBTCTransfer(paymentDetails);
+      } else if (tokenType === 'USDCx') {
+        return await this.sendUSDCxTransfer(paymentDetails);
       } else {
         return await this.sendSTXTransfer(paymentDetails);
       }
@@ -373,6 +377,155 @@ export class X402PaymentClient {
         txRaw: '',
         success: false,
         error: error instanceof Error ? error.message : 'sBTC transfer failed',
+      };
+    }
+  }
+
+  /**
+   * Sign USDCx token transfer (without broadcasting)
+   * USDCx is Circle's USDC on Stacks via xReserve (SIP-010 fungible token)
+   */
+  async signUSDCxTransfer(details: PaymentDetails): Promise<SignedPaymentResult> {
+    try {
+      // Determine network
+      const network =
+        typeof details.network === 'string'
+          ? this.getNetworkInstance(details.network)
+          : details.network;
+
+      // Get sender address from private key
+      const senderAddress = getAddressFromPrivateKey(
+        details.senderKey,
+        network instanceof StacksMainnet ? TransactionVersion.Mainnet : TransactionVersion.Testnet
+      );
+
+      // Validate token contract
+      if (!details.tokenContract) {
+        throw new Error('Token contract required for USDCx transfers');
+      }
+
+      const { address: contractAddress, name: contractName } = details.tokenContract;
+
+      // Build function arguments for SIP-010 transfer
+      const functionArgs = [
+        uintCV(details.amount.toString()),
+        principalCV(senderAddress),
+        principalCV(details.recipient),
+        details.memo ? someCV(bufferCVFromString(details.memo)) : noneCV(),
+      ];
+
+      // Build transaction options
+      const txOptions = {
+        contractAddress,
+        contractName,
+        functionName: 'transfer',
+        functionArgs,
+        senderKey: this.privateKey,
+        network,
+        anchorMode: AnchorMode.Any,
+        postConditionMode: PostConditionMode.Allow,
+        ...(details.nonce !== undefined && { nonce: details.nonce }),
+        ...(details.fee !== undefined && { fee: details.fee }),
+      };
+
+      // Create transaction (signed but not broadcast)
+      const transaction = await makeContractCall(txOptions);
+
+      // Return the signed transaction hex
+      const serialized = transaction.serialize();
+      return {
+        signedTransaction: Buffer.from(serialized).toString('hex'),
+        success: true,
+        senderAddress,
+      };
+    } catch (error) {
+      return {
+        signedTransaction: '',
+        success: false,
+        error: error instanceof Error ? error.message : 'USDCx signing failed',
+      };
+    }
+  }
+
+  /**
+   * Send USDCx token transfer (SIP-010 fungible token)
+   * USDCx is Circle's USDC on Stacks via xReserve
+   */
+  async sendUSDCxTransfer(details: PaymentDetails): Promise<PaymentResult> {
+    try {
+      // Determine network
+      const network =
+        typeof details.network === 'string'
+          ? this.getNetworkInstance(details.network)
+          : details.network;
+
+      // Get sender address from private key
+      const senderAddress = getAddressFromPrivateKey(
+        details.senderKey,
+        network instanceof StacksMainnet ? TransactionVersion.Mainnet : TransactionVersion.Testnet
+      );
+
+      // Validate token contract
+      if (!details.tokenContract) {
+        throw new Error('Token contract required for USDCx transfers');
+      }
+
+      const { address: contractAddress, name: contractName } = details.tokenContract;
+
+      // Build function arguments for SIP-010 transfer
+      // transfer function signature: (amount uint) (sender principal) (recipient principal) (memo (optional (buff 34)))
+      const functionArgs = [
+        uintCV(details.amount.toString()),
+        principalCV(senderAddress),
+        principalCV(details.recipient),
+        details.memo ? someCV(bufferCVFromString(details.memo)) : noneCV(),
+      ];
+
+      // Build transaction options
+      const txOptions = {
+        contractAddress,
+        contractName,
+        functionName: 'transfer',
+        functionArgs,
+        senderKey: this.privateKey,
+        network,
+        anchorMode: AnchorMode.Any,
+        postConditionMode: PostConditionMode.Allow,
+        ...(details.nonce !== undefined && { nonce: details.nonce }),
+        ...(details.fee !== undefined && { fee: details.fee }),
+      };
+
+      // Create transaction
+      const transaction = await makeContractCall(txOptions);
+
+      // Broadcast transaction
+      const broadcastResponse: TxBroadcastResult = await broadcastTransaction(
+        transaction,
+        network
+      );
+
+      // Check for errors in broadcast response
+      const txRaw = Buffer.from(transaction.serialize()).toString('hex');
+      if ('error' in broadcastResponse) {
+        return {
+          txId: '',
+          txRaw,
+          success: false,
+          error: broadcastResponse.error,
+        };
+      }
+
+      return {
+        txId: broadcastResponse.txid,
+        txRaw,
+        success: true,
+      };
+    } catch (error) {
+      return {
+        txId: '',
+        txRaw: '',
+        success: false,
+        error: error instanceof Error ? error.message : 'USDCx transfer failed',
       };
     }
   }

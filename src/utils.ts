@@ -40,6 +40,22 @@ export function BTCtoSats(btc: number | string): bigint {
 }
 
 /**
+ * Convert USDCx to micro-units (6 decimals, same as USDC)
+ */
+export function USDCxToMicroUSDCx(usdcx: number | string): bigint {
+  const amount = typeof usdcx === 'string' ? parseFloat(usdcx) : usdcx;
+  return BigInt(Math.floor(amount * 1_000_000));
+}
+
+/**
+ * Convert micro-USDCx to USDCx
+ */
+export function microUSDCxToUSDCx(microUSDCx: bigint | string): string {
+  const amount = typeof microUSDCx === 'string' ? BigInt(microUSDCx) : microUSDCx;
+  return (Number(amount) / 1_000_000).toFixed(6);
+}
+
+/**
  * Generate a random Stacks keypair
  */
 export function generateKeypair(network: NetworkType = 'testnet') {
@@ -118,6 +134,10 @@ export function formatPaymentAmount(
     const btc = satsToBTC(amount);
     formattedAmount = parseFloat(btc).toFixed(decimals);
     symbol = 'sBTC';
+  } else if (tokenType === 'USDCx') {
+    const usdcx = microUSDCxToUSDCx(amount);
+    formattedAmount = parseFloat(usdcx).toFixed(decimals);
+    symbol = 'USDCx';
   } else {
     const stx = microSTXtoSTX(amount);
     formattedAmount = parseFloat(stx).toFixed(decimals);
@@ -289,22 +309,63 @@ export function getDefaultSBTCContract(network: NetworkType): TokenContract {
 }
 
 /**
+ * Get default USDCx contract for network
+ * USDCx is Circle's USDC on Stacks via xReserve
+ */
+export function getDefaultUSDCxContract(network: NetworkType): TokenContract {
+  if (network === 'mainnet') {
+    // Mainnet USDCx contract
+    return {
+      address: 'SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE',
+      name: 'usdcx',
+    };
+  } else {
+    // Testnet USDCx contract
+    return {
+      address: 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
+      name: 'usdcx',
+    };
+  }
+}
+
+/**
  * Get token symbol for display
  */
 export function getTokenSymbol(tokenType: TokenType): string {
-  return tokenType === 'sBTC' ? 'sBTC' : 'STX';
+  switch (tokenType) {
+    case 'sBTC':
+      return 'sBTC';
+    case 'USDCx':
+      return 'USDCx';
+    default:
+      return 'STX';
+  }
 }
 
 /**
  * Get token decimals
  */
 export function getTokenDecimals(tokenType: TokenType): number {
-  return tokenType === 'sBTC' ? 8 : 6;
+  switch (tokenType) {
+    case 'sBTC':
+      return 8; // 1 sBTC = 100,000,000 sats
+    case 'USDCx':
+      return 6; // 1 USDCx = 1,000,000 micro-USDCx (same as USDC)
+    default:
+      return 6; // 1 STX = 1,000,000 microSTX
+  }
 }
 
 /**
  * Get smallest unit name for token
  */
 export function getTokenSmallestUnit(tokenType: TokenType): string {
-  return tokenType === 'sBTC' ? 'sats' : 'microSTX';
+  switch (tokenType) {
+    case 'sBTC':
+      return 'sats';
+    case 'USDCx':
+      return 'micro-USDCx';
+    default:
+      return 'microSTX';
+  }
 }

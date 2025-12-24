@@ -88,10 +88,10 @@ async function signPayment(
   const network = getNetworkInstance(paymentRequest.network);
   const memo = paymentRequest.nonce.substring(0, 34); // Max 34 bytes for Stacks memo
 
-  if (tokenType === 'sBTC') {
-    // sBTC transfer (SIP-010 contract call)
+  if (tokenType === 'sBTC' || tokenType === 'USDCx') {
+    // sBTC or USDCx transfer (SIP-010 contract call)
     if (!paymentRequest.tokenContract) {
-      throw new Error('Token contract required for sBTC payments');
+      throw new Error(`Token contract required for ${tokenType} payments`);
     }
 
     const { address: contractAddress, name: contractName } = paymentRequest.tokenContract;

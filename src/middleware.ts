@@ -38,9 +38,13 @@ export function x402PaymentRequired(config: X402MiddlewareConfig) {
       }
 
       // Determine token type from header or config
-      const tokenType = (req.headers['x-payment-token-type'] as string)?.toLowerCase() === 'sbtc'
-        ? 'sBTC'
-        : config.tokenType || 'STX';
+      const headerTokenType = (req.headers['x-payment-token-type'] as string)?.toLowerCase();
+      let tokenType: 'STX' | 'sBTC' | 'USDCx' = config.tokenType || 'STX';
+      if (headerTokenType === 'sbtc') {
+        tokenType = 'sBTC';
+      } else if (headerTokenType === 'usdcx') {
+        tokenType = 'USDCx';
+      }
 
       let verification;
 

@@ -214,6 +214,28 @@ async function example6_PostRequest() {
   }
 }
 
+/**
+ * Example 7: USDCx payment (automatic)
+ * USDCx is Circle's USDC on Stacks via xReserve
+ */
+async function example7_USDCxPayment() {
+  console.log('\n--- Example 7: USDCx Payment (USDC on Stacks) ---');
+
+  try {
+    const response = await api.get('/api/stablecoin-data');
+
+    console.log('Success! Received stablecoin data:', response.data.data);
+
+    const paymentResponse = decodeXPaymentResponse(response.headers['x-payment-response']);
+    if (paymentResponse) {
+      console.log('USDCx Payment response:', paymentResponse);
+      console.log('Explorer:', getExplorerURL(paymentResponse.txId, NETWORK));
+    }
+  } catch (error: any) {
+    console.error('Error:', error.response?.data?.error || error.message);
+  }
+}
+
 // Main execution
 async function main() {
   console.log('='.repeat(60));
@@ -240,6 +262,7 @@ async function main() {
   // await example4_ManualPaymentFlow();
   // await example5_SBTCPayment();
   // await example6_PostRequest();
+  // await example7_USDCxPayment();
 
   console.log('\n' + '='.repeat(60));
   console.log('Examples completed');

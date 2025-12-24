@@ -29,7 +29,7 @@ export interface SettleOptions {
   expectedSender?: string;
 
   /** Token type (defaults to STX) */
-  tokenType?: 'STX' | 'sBTC';
+  tokenType?: 'STX' | 'sBTC' | 'USDCx';
 
   /** API resource being accessed (optional, for tracking) */
   resource?: string;
@@ -77,8 +77,8 @@ export class X402PaymentVerifier {
         network: this.network,
         resource: options.resource,
         method: options.method,
-        // Map token type to facilitator API format (STX or SBTC)
-        token_type: options.tokenType === 'sBTC' ? 'SBTC' : 'STX',
+        // Map token type to facilitator API format (STX, SBTC, or USDCX)
+        token_type: options.tokenType === 'sBTC' ? 'SBTC' : options.tokenType === 'USDCx' ? 'USDCX' : 'STX',
       };
 
       // Call facilitator API
@@ -192,7 +192,7 @@ export class X402PaymentVerifier {
         network: this.network,
         resource: options.resource,
         method: options.method,
-        token_type: options.tokenType === 'sBTC' ? 'SBTC' : 'STX',
+        token_type: options.tokenType === 'sBTC' ? 'SBTC' : options.tokenType === 'USDCx' ? 'USDCX' : 'STX',
       };
 
       // Call facilitator API settle endpoint

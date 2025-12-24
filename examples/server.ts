@@ -12,7 +12,9 @@ import {
   getPayment,
   STXtoMicroSTX,
   BTCtoSats,
+  USDCxToMicroUSDCx,
   getDefaultSBTCContract,
+  getDefaultUSDCxContract,
 } from '../src';
 
 const app = express();
@@ -212,6 +214,38 @@ app.get(
   }
 );
 
+// Example 6: USDCx payment endpoint (USDC on Stacks via Circle xReserve)
+app.get(
+  '/api/stablecoin-data',
+  x402PaymentRequired({
+    amount: USDCxToMicroUSDCx(0.10), // $0.10 USDCx
+    address: SERVER_ADDRESS,
+    network: NETWORK,
+    facilitatorUrl: FACILITATOR_URL,
+    tokenType: 'USDCx',
+    tokenContract: getDefaultUSDCxContract(NETWORK),
+  }),
+  (req: Request, res: Response) => {
+    const payment = getPayment(req);
+
+    res.json({
+      success: true,
+      data: {
+        stablecoinInfo: 'Premium stablecoin market data',
+        usdcSupply: '25,000,000,000 USDC',
+        usdcxOnStacks: '5,000,000 USDCx',
+        timestamp: new Date().toISOString(),
+      },
+      payment: {
+        txId: payment.txId,
+        amount: payment.amount.toString(),
+        sender: payment.sender,
+        tokenType: 'USDCx',
+      },
+    });
+  }
+);
+
 // Health check endpoint (no payment required)
 app.get('/health', (req: Request, res: Response) => {
   res.json({
@@ -234,6 +268,7 @@ app.listen(PORT, () => {
   console.log('  GET  /api/search?q=query - Search (10 free/hour, then 0.02 STX, confirmed)');
   console.log('  POST /api/compute - Compute task (0.5 STX, confirmed)');
   console.log('  GET  /api/bitcoin-data - Bitcoin data (0.00001 BTC / 1000 sats in sBTC, confirmed)');
+  console.log('  GET  /api/stablecoin-data - Stablecoin data ($0.10 USDCx, confirmed)');
 });
 
 export default app;

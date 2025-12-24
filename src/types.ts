@@ -12,7 +12,7 @@ export type NetworkType = 'mainnet' | 'testnet';
 /**
  * Token type for payments
  */
-export type TokenType = 'STX' | 'sBTC';
+export type TokenType = 'STX' | 'sBTC' | 'USDCx';
 
 /**
  * Token contract configuration
@@ -291,8 +291,8 @@ export interface FacilitatorVerifyRequest {
   /** HTTP method being used (optional, for x402 tracking) */
   method?: string;
 
-  /** Token type in Facilitator API format: 'STX' or 'SBTC' (uppercase) */
-  token_type?: 'STX' | 'SBTC';
+  /** Token type in Facilitator API format: 'STX', 'SBTC', or 'USDCX' (uppercase) */
+  token_type?: 'STX' | 'SBTC' | 'USDCX';
 }
 
 /**
@@ -352,8 +352,8 @@ export interface FacilitatorSettleRequest {
   /** Hex-encoded signed transaction (with or without 0x prefix) */
   signed_transaction: string;
 
-  /** Token type: 'STX' or 'SBTC' */
-  token_type?: 'STX' | 'SBTC';
+  /** Token type: 'STX', 'SBTC', or 'USDCX' */
+  token_type?: 'STX' | 'SBTC' | 'USDCX';
 
   /** Expected recipient address */
   expected_recipient: string;
