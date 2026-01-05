@@ -294,10 +294,10 @@ export function getNetworkInstance(network: NetworkType) {
  */
 export function getDefaultSBTCContract(network: NetworkType): TokenContract {
   if (network === 'mainnet') {
-    // Mainnet sBTC contract (update when mainnet launches)
+    // Mainnet sBTC contract
     return {
-      address: 'SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9',
-      name: 'token-sbtc',
+      address: 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4',
+      name: 'sbtc-token',
     };
   } else {
     // Testnet sBTC contract
