@@ -111,7 +111,7 @@ export function getAPIEndpoint(network: NetworkType): string {
  */
 export function getExplorerURL(txId: string, network: NetworkType = 'mainnet'): string {
   const chainParam = network === 'testnet' ? '?chain=testnet' : '';
-  return `https://explorer.hiro.so/txid/0x${txId}${chainParam}`;
+  return `https://explorer.hiro.so/txid/${txId}${chainParam}`;
 }
 
 /**
