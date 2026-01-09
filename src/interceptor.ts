@@ -76,17 +76,27 @@ function getNetworkInstance(network: NetworkType): StacksNetwork {
 }
 
 /**
+ * Options for payment signing
+ */
+export interface SignPaymentOptions {
+  /** Build as sponsored transaction (for gasless relay) */
+  sponsored?: boolean;
+}
+
+/**
  * Sign a payment transaction based on x402 payment request
  * Returns the signed transaction hex (does not broadcast)
  */
 async function signPayment(
   paymentRequest: X402PaymentRequired,
-  account: StacksAccount
+  account: StacksAccount,
+  options: SignPaymentOptions = {}
 ): Promise<string> {
   const amount = BigInt(paymentRequest.maxAmountRequired);
   const tokenType = paymentRequest.tokenType || 'STX';
   const network = getNetworkInstance(paymentRequest.network);
   const memo = paymentRequest.nonce.substring(0, 34); // Max 34 bytes for Stacks memo
+  const { sponsored } = options;
 
   if (tokenType === 'sBTC' || tokenType === 'USDCx') {
     // sBTC or USDCx transfer (SIP-010 contract call)
@@ -112,6 +122,7 @@ async function signPayment(
       network,
       anchorMode: AnchorMode.Any,
       postConditionMode: PostConditionMode.Allow,
+      ...(sponsored && { sponsored: true, fee: 0n }),
     });
 
     // Convert Uint8Array to hex string
@@ -126,6 +137,7 @@ async function signPayment(
       network,
       memo,
       anchorMode: AnchorMode.Any,
+      ...(sponsored && { sponsored: true, fee: 0n }),
     });
 
     // Convert Uint8Array to hex string
@@ -157,6 +169,14 @@ function isValidPaymentRequest(data: unknown): data is X402PaymentRequired {
 const paymentAttempted = new WeakSet<InternalAxiosRequestConfig>();
 
 /**
+ * Configuration options for the payment interceptor
+ */
+export interface PaymentInterceptorConfig {
+  /** Build transactions as sponsored (for gasless relay) */
+  sponsored?: boolean;
+}
+
+/**
  * Wrap an axios instance with automatic x402 payment handling
  * Similar to x402-axios's withPaymentInterceptor
  *
@@ -175,11 +195,19 @@ const paymentAttempted = new WeakSet<InternalAxiosRequestConfig>();
  * // Use normally - 402 handling is automatic
  * const response = await api.get('/premium-data');
  * console.log(response.data);
+ *
+ * // For gasless transactions via sponsor relay:
+ * const gaslessApi = withPaymentInterceptor(
+ *   axios.create({ baseURL: 'https://sponsor-relay.example.com' }),
+ *   account,
+ *   { sponsored: true }
+ * );
  * ```
  */
 export function withPaymentInterceptor(
   axiosInstance: AxiosInstance,
-  account: StacksAccount
+  account: StacksAccount,
+  config: PaymentInterceptorConfig = {}
 ): AxiosInstance {
   // Response interceptor to handle 402 Payment Required
   axiosInstance.interceptors.response.use(
@@ -218,7 +246,9 @@ export function withPaymentInterceptor(
 
       try {
         // Sign the payment (don't broadcast - server will do that)
-        const signedTransaction = await signPayment(paymentRequest, account);
+        const signedTransaction = await signPayment(paymentRequest, account, {
+          sponsored: config.sponsored,
+        });
 
         // Retry the request with the signed payment
         originalRequest.headers = originalRequest.headers || {};
@@ -250,14 +280,20 @@ export function withPaymentInterceptor(
  * const api = createPaymentClient(account, { baseURL: 'https://api.example.com' });
  *
  * const response = await api.get('/premium-data');
+ *
+ * // For gasless transactions via sponsor relay:
+ * const gaslessApi = createPaymentClient(account, {
+ *   baseURL: 'https://sponsor-relay.example.com'
+ * }, { sponsored: true });
  * ```
  */
 export function createPaymentClient(
   account: StacksAccount,
-  config?: Parameters<typeof import('axios').default.create>[0]
+  axiosConfig?: Parameters<typeof import('axios').default.create>[0],
+  paymentConfig?: PaymentInterceptorConfig
 ): AxiosInstance {
   // Dynamic import to avoid requiring axios at module load time
   const axios = require('axios');
-  const instance = axios.create(config);
-  return withPaymentInterceptor(instance, account);
+  const instance = axios.create(axiosConfig);
+  return withPaymentInterceptor(instance, account, paymentConfig);
 }

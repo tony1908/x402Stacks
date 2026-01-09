@@ -86,6 +86,9 @@ export interface PaymentDetails {
   /** Optional fee (auto-estimated if not provided) */
   fee?: bigint;
 
+  /** Build as sponsored transaction (for gasless relay) */
+  sponsored?: boolean;
+
   /** Token type (defaults to STX) */
   tokenType?: TokenType;
 
