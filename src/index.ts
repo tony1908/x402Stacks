@@ -11,6 +11,7 @@ export {
   decodeXPaymentResponse,
   encodeXPaymentResponse,
 } from './interceptor';
+export type { SignPaymentOptions, PaymentInterceptorConfig } from './interceptor';
 
 // Legacy client (class-based)
 export { X402PaymentClient } from './client';

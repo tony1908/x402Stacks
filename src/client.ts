@@ -155,6 +155,7 @@ export class X402PaymentClient {
         anchorMode: AnchorMode.Any,
         ...(details.nonce !== undefined && { nonce: details.nonce }),
         ...(details.fee !== undefined && { fee: details.fee }),
+        ...(details.sponsored && { sponsored: true, fee: 0n }),
       };
 
       // Create transaction (signed but not broadcast)
@@ -220,6 +221,7 @@ export class X402PaymentClient {
         postConditionMode: PostConditionMode.Allow,
         ...(details.nonce !== undefined && { nonce: details.nonce }),
         ...(details.fee !== undefined && { fee: details.fee }),
+        ...(details.sponsored && { sponsored: true, fee: 0n }),
       };
 
       // Create transaction (signed but not broadcast)
@@ -262,6 +264,7 @@ export class X402PaymentClient {
         anchorMode: AnchorMode.Any,
         ...(details.nonce !== undefined && { nonce: details.nonce }),
         ...(details.fee !== undefined && { fee: details.fee }),
+        ...(details.sponsored && { sponsored: true, fee: 0n }),
       };
 
       // Create transaction
@@ -344,6 +347,7 @@ export class X402PaymentClient {
         postConditionMode: PostConditionMode.Allow,
         ...(details.nonce !== undefined && { nonce: details.nonce }),
         ...(details.fee !== undefined && { fee: details.fee }),
+        ...(details.sponsored && { sponsored: true, fee: 0n }),
       };
 
       // Create transaction
@@ -426,6 +430,7 @@ export class X402PaymentClient {
         postConditionMode: PostConditionMode.Allow,
         ...(details.nonce !== undefined && { nonce: details.nonce }),
         ...(details.fee !== undefined && { fee: details.fee }),
+        ...(details.sponsored && { sponsored: true, fee: 0n }),
       };
 
       // Create transaction (signed but not broadcast)
@@ -493,6 +498,7 @@ export class X402PaymentClient {
         postConditionMode: PostConditionMode.Allow,
         ...(details.nonce !== undefined && { nonce: details.nonce }),
         ...(details.fee !== undefined && { fee: details.fee }),
+        ...(details.sponsored && { sponsored: true, fee: 0n }),
       };
 
       // Create transaction
