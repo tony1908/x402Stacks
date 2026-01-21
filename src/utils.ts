@@ -6,6 +6,7 @@
 import { makeRandomPrivKey, getPublicKey, publicKeyToAddress, AddressVersion } from '@stacks/transactions';
 import { StacksMainnet, StacksTestnet } from '@stacks/network';
 import { NetworkType, TokenType, TokenContract } from './types';
+import { NetworkV2, STACKS_NETWORKS } from './types-v2';
 
 /**
  * Convert microSTX to STX
@@ -368,4 +369,109 @@ export function getTokenSmallestUnit(tokenType: TokenType): string {
     default:
       return 'microSTX';
   }
+}
+
+// ===== V2 CAIP-2 Network Utilities =====
+
+/**
+ * Convert V1 network type to CAIP-2 format
+ */
+export function networkToCAIP2(network: NetworkType): NetworkV2 {
+  return network === 'mainnet' ? STACKS_NETWORKS.MAINNET : STACKS_NETWORKS.TESTNET;
+}
+
+/**
+ * Convert CAIP-2 network identifier to V1 network type
+ * @throws Error if the CAIP-2 identifier is not a valid Stacks network
+ */
+export function networkFromCAIP2(caip2: string): NetworkType {
+  switch (caip2) {
+    case STACKS_NETWORKS.MAINNET:
+      return 'mainnet';
+    case STACKS_NETWORKS.TESTNET:
+      return 'testnet';
+    default:
+      if (caip2.startsWith('stacks:')) {
+        throw new Error(`Unsupported Stacks network: ${caip2}`);
+      }
+      throw new Error(`Invalid CAIP-2 format: ${caip2}`);
+  }
+}
+
+/**
+ * Check if a string is a valid Stacks CAIP-2 network identifier
+ */
+export function isValidStacksCAIP2(caip2: string): caip2 is NetworkV2 {
+  return caip2 === STACKS_NETWORKS.MAINNET || caip2 === STACKS_NETWORKS.TESTNET;
+}
+
+/**
+ * Convert V1 token type to V2 asset identifier
+ * For STX, returns "STX"
+ * For SIP-010 tokens, returns the contract identifier (address.name)
+ */
+export function assetToV2(tokenType: TokenType, tokenContract?: TokenContract): string {
+  switch (tokenType) {
+    case 'STX':
+      return 'STX';
+    case 'sBTC':
+      if (tokenContract) {
+        return `${tokenContract.address}.${tokenContract.name}`;
+      }
+      return 'SBTC'; // Fallback symbol
+    case 'USDCx':
+      if (tokenContract) {
+        return `${tokenContract.address}.${tokenContract.name}`;
+      }
+      return 'USDCX'; // Fallback symbol
+    default:
+      return 'STX';
+  }
+}
+
+/**
+ * Convert V2 asset identifier to V1 token type
+ * Returns the token type and optionally the contract info
+ */
+export function assetFromV2(asset: string): { tokenType: TokenType; tokenContract?: TokenContract } {
+  // Check for native STX
+  if (asset === 'STX') {
+    return { tokenType: 'STX' };
+  }
+
+  // Check for known token symbols
+  if (asset === 'SBTC') {
+    return { tokenType: 'sBTC' };
+  }
+  if (asset === 'USDCX') {
+    return { tokenType: 'USDCx' };
+  }
+
+  // Check if it's a contract identifier (address.name)
+  if (asset.includes('.')) {
+    const [address, name] = asset.split('.');
+
+    // Try to identify known tokens by contract name
+    if (name.toLowerCase().includes('sbtc') || name.toLowerCase() === 'sbtc-token') {
+      return {
+        tokenType: 'sBTC',
+        tokenContract: { address, name },
+      };
+    }
+    if (name.toLowerCase().includes('usdc') || name.toLowerCase() === 'usdcx') {
+      return {
+        tokenType: 'USDCx',
+        tokenContract: { address, name },
+      };
+    }
+
+    // Unknown SIP-010 token, default to STX behavior but include contract
+    return {
+      tokenType: 'STX', // Fallback
+      tokenContract: { address, name },
+    };
+  }
+
+  // Default to STX
+  return { tokenType: 'STX' };
 }

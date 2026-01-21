@@ -1,7 +1,7 @@
 /**
- * x402-stacks - Axios Payment Interceptor
- * Provides automatic x402 payment handling for axios instances
- * Following the x402-axios pattern from the official x402 ecosystem
+ * x402-stacks - Axios Payment Interceptor (V1 Legacy)
+ * Provides automatic x402 V1 payment handling for axios instances
+ * Note: For new projects, use the default exports from interceptor-v2.ts
  */
 
 import { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
@@ -27,10 +27,10 @@ import {
 } from './types';
 
 /**
- * Create a Stacks account from a private key
- * Similar to viem's privateKeyToAccount pattern
+ * Create a Stacks account from a private key (V1)
+ * @deprecated Use privateKeyToAccount from the main exports instead
  */
-export function privateKeyToAccount(
+export function privateKeyToAccountV1(
   privateKey: string,
   network: NetworkType = 'testnet'
 ): StacksAccount {
@@ -157,17 +157,17 @@ function isValidPaymentRequest(data: unknown): data is X402PaymentRequired {
 const paymentAttempted = new WeakSet<InternalAxiosRequestConfig>();
 
 /**
- * Wrap an axios instance with automatic x402 payment handling
- * Similar to x402-axios's withPaymentInterceptor
+ * Wrap an axios instance with automatic x402 V1 payment handling
+ * @deprecated Use wrapAxiosWithPayment from the main exports instead
  *
  * @example
  * ```typescript
  * import axios from 'axios';
- * import { withPaymentInterceptor, privateKeyToAccount } from 'x402-stacks';
+ * import { wrapAxiosWithPaymentV1, privateKeyToAccountV1 } from 'x402-stacks';
  *
- * const account = privateKeyToAccount(process.env.PRIVATE_KEY!, 'testnet');
+ * const account = privateKeyToAccountV1(process.env.PRIVATE_KEY!, 'testnet');
  *
- * const api = withPaymentInterceptor(
+ * const api = wrapAxiosWithPaymentV1(
  *   axios.create({ baseURL: 'https://api.example.com' }),
  *   account
  * );
@@ -177,7 +177,7 @@ const paymentAttempted = new WeakSet<InternalAxiosRequestConfig>();
  * console.log(response.data);
  * ```
  */
-export function withPaymentInterceptor(
+export function wrapAxiosWithPaymentV1(
   axiosInstance: AxiosInstance,
   account: StacksAccount
 ): AxiosInstance {
@@ -239,25 +239,33 @@ export function withPaymentInterceptor(
 }
 
 /**
- * Create a pre-configured axios instance with payment handling
- * Convenience function that combines axios.create() and withPaymentInterceptor()
+ * Create a pre-configured axios instance with V1 payment handling
+ * @deprecated Use createPaymentClient from the main exports instead
  *
  * @example
  * ```typescript
- * import { createPaymentClient, privateKeyToAccount } from 'x402-stacks';
+ * import { createPaymentClientV1, privateKeyToAccountV1 } from 'x402-stacks';
  *
- * const account = privateKeyToAccount(process.env.PRIVATE_KEY!, 'testnet');
- * const api = createPaymentClient(account, { baseURL: 'https://api.example.com' });
+ * const account = privateKeyToAccountV1(process.env.PRIVATE_KEY!, 'testnet');
+ * const api = createPaymentClientV1(account, { baseURL: 'https://api.example.com' });
  *
  * const response = await api.get('/premium-data');
  * ```
  */
-export function createPaymentClient(
+export function createPaymentClientV1(
   account: StacksAccount,
   config?: Parameters<typeof import('axios').default.create>[0]
 ): AxiosInstance {
   // Dynamic import to avoid requiring axios at module load time
   const axios = require('axios');
   const instance = axios.create(config);
-  return withPaymentInterceptor(instance, account);
+  return wrapAxiosWithPaymentV1(instance, account);
 }
+
+// ===== Backward Compatibility Aliases =====
+/** @deprecated Use privateKeyToAccount from the main exports */
+export const privateKeyToAccount = privateKeyToAccountV1;
+/** @deprecated Use wrapAxiosWithPayment from the main exports */
+export const withPaymentInterceptor = wrapAxiosWithPaymentV1;
+/** @deprecated Use createPaymentClient from the main exports */
+export const createPaymentClient = createPaymentClientV1;

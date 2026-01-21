@@ -1,6 +1,7 @@
 /**
- * x402-stacks - Payment Verifier
- * Handles verification of STX token transfers using facilitator API
+ * x402-stacks - Payment Verifier (V1 Legacy)
+ * Handles verification of STX token transfers using V1 facilitator API
+ * Note: For new projects, use X402PaymentVerifier from verifier-v2.ts
  */
 
 import axios, { AxiosInstance } from 'axios';
@@ -16,9 +17,10 @@ import {
 } from './types';
 
 /**
- * Options for settling a payment via the facilitator
+ * Options for settling a payment via the V1 facilitator
+ * @deprecated Use SettleOptions from the main exports instead
  */
-export interface SettleOptions {
+export interface SettleOptionsV1 {
   /** Expected recipient address */
   expectedRecipient: string;
 
@@ -39,9 +41,10 @@ export interface SettleOptions {
 }
 
 /**
- * Payment verifier for validating x402 payments on Stacks
+ * Payment verifier for validating x402 V1 payments on Stacks
+ * @deprecated Use X402PaymentVerifier from the main exports instead
  */
-export class X402PaymentVerifier {
+export class X402PaymentVerifierV1 {
   private facilitatorUrl: string;
   private network: NetworkType;
   private httpClient: AxiosInstance;
@@ -175,12 +178,11 @@ export class X402PaymentVerifier {
   }
 
   /**
-   * Settle a payment using the facilitator API (x402 facilitator pattern)
-   * The facilitator will broadcast the signed transaction and wait for confirmation
+   * Settle a payment using the V1 facilitator API
    */
   async settlePayment(
     signedTransaction: string,
-    options: SettleOptions
+    options: SettleOptionsV1
   ): Promise<VerifiedPayment> {
     try {
       // Build facilitator API request
@@ -290,3 +292,9 @@ export class X402PaymentVerifier {
     return null;
   }
 }
+
+// ===== Backward Compatibility Aliases =====
+/** @deprecated Use X402PaymentVerifier from the main exports */
+export const X402PaymentVerifier = X402PaymentVerifierV1;
+/** @deprecated Use SettleOptions from the main exports */
+export type SettleOptions = SettleOptionsV1;

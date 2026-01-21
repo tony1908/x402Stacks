@@ -1,11 +1,11 @@
 /**
- * x402-stacks - Express Middleware
- * Middleware for handling x402 payment requirements in Express.js applications
- * Uses the x402 facilitator pattern: client signs, server settles
+ * x402-stacks - Express Middleware (V1 Legacy)
+ * Middleware for handling x402 V1 payment requirements in Express.js applications
+ * Note: For new projects, use paymentMiddleware from middleware-v2.ts
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { X402PaymentVerifier, SettleOptions } from './verifier';
+import { X402PaymentVerifierV1, SettleOptionsV1 } from './verifier';
 import {
   X402MiddlewareConfig,
   X402PaymentRequired,
@@ -13,15 +13,12 @@ import {
 import { randomBytes } from 'crypto';
 
 /**
- * Express middleware for x402 payment requirements
- * Uses the x402 facilitator pattern:
- * 1. Client sends signed transaction in X-PAYMENT header
- * 2. Server calls facilitator /settle endpoint to broadcast and confirm
- * 3. Server grants access after payment is confirmed
+ * Express middleware for x402 V1 payment requirements
+ * @deprecated Use paymentMiddleware from the main exports instead
  */
-export function x402PaymentRequired(config: X402MiddlewareConfig) {
+export function paymentMiddlewareV1(config: X402MiddlewareConfig) {
   const facilitatorUrl = config.facilitatorUrl || 'http://localhost:8085';
-  const verifier = new X402PaymentVerifier(facilitatorUrl, config.network);
+  const verifier = new X402PaymentVerifierV1(facilitatorUrl, config.network);
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -50,7 +47,7 @@ export function x402PaymentRequired(config: X402MiddlewareConfig) {
 
       if (signedPayment) {
         // New x402 facilitator pattern: settle the signed transaction
-        const settleOptions: SettleOptions = {
+        const settleOptions: SettleOptionsV1 = {
           expectedRecipient: config.address,
           minAmount: BigInt(config.amount),
           tokenType,
@@ -162,33 +159,36 @@ function sendPaymentRequired(
 }
 
 /**
- * Utility middleware to extract payment info from request
+ * Utility to get V1 payment info from request
+ * @deprecated Use getPayment from the main exports instead
  */
-export function getPayment(req: Request) {
+export function getPaymentV1(req: Request) {
   return (req as any).payment;
 }
 
 /**
- * Create a simple payment gate that requires payment before proceeding
+ * Create a simple payment gate that requires payment (V1)
+ * @deprecated Use createPaymentGate from the main exports instead
  */
-export function createPaymentGate(config: X402MiddlewareConfig) {
-  return x402PaymentRequired(config);
+export function createPaymentGateV1(config: X402MiddlewareConfig) {
+  return paymentMiddlewareV1(config);
 }
 
 /**
- * Conditional payment middleware - only require payment if condition is met
+ * Conditional payment middleware (V1)
+ * @deprecated Use conditionalPayment from the main exports instead
  */
-export function conditionalPayment(
+export function conditionalPaymentV1(
   condition: (req: Request) => boolean | Promise<boolean>,
   config: X402MiddlewareConfig
 ) {
-  const paymentMiddleware = x402PaymentRequired(config);
+  const middleware = paymentMiddlewareV1(config);
 
   return async (req: Request, res: Response, next: NextFunction) => {
     const shouldRequirePayment = await condition(req);
 
     if (shouldRequirePayment) {
-      return paymentMiddleware(req, res, next);
+      return middleware(req, res, next);
     }
 
     next();
@@ -196,9 +196,10 @@ export function conditionalPayment(
 }
 
 /**
- * Tiered payment middleware - different amounts based on request
+ * Tiered payment middleware (V1)
+ * @deprecated Use tieredPayment from the main exports instead
  */
-export function tieredPayment(
+export function tieredPaymentV1(
   getTier: (req: Request) => { amount: string | bigint; resource?: string } | Promise<{ amount: string | bigint; resource?: string }>,
   baseConfig: Omit<X402MiddlewareConfig, 'amount' | 'resource'>
 ) {
@@ -211,15 +212,16 @@ export function tieredPayment(
       resource: tier.resource,
     };
 
-    const middleware = x402PaymentRequired(config);
+    const middleware = paymentMiddlewareV1(config);
     return middleware(req, res, next);
   };
 }
 
 /**
- * Rate limiting with payment - require payment after free tier
+ * Rate limiting with payment (V1)
+ * @deprecated Use paymentRateLimit from the main exports instead
  */
-export function paymentRateLimit(config: {
+export function paymentRateLimitV1(config: {
   freeRequests: number;
   windowMs: number;
   paymentConfig: X402MiddlewareConfig;
@@ -227,7 +229,7 @@ export function paymentRateLimit(config: {
 }) {
   const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
-  const paymentMiddleware = x402PaymentRequired(config.paymentConfig);
+  const middleware = paymentMiddlewareV1(config.paymentConfig);
 
   return async (req: Request, res: Response, next: NextFunction) => {
     const key = config.keyGenerator ? config.keyGenerator(req) : req.ip || 'unknown';
@@ -251,7 +253,7 @@ export function paymentRateLimit(config: {
 
     // Check if over free tier
     if (record.count >= config.freeRequests) {
-      return paymentMiddleware(req, res, next);
+      return middleware(req, res, next);
     }
 
     // Increment count and continue
@@ -259,3 +261,17 @@ export function paymentRateLimit(config: {
     next();
   };
 }
+
+// ===== Backward Compatibility Aliases =====
+/** @deprecated Use paymentMiddleware from the main exports */
+export const x402PaymentRequired = paymentMiddlewareV1;
+/** @deprecated Use getPayment from the main exports */
+export const getPayment = getPaymentV1;
+/** @deprecated Use createPaymentGate from the main exports */
+export const createPaymentGate = createPaymentGateV1;
+/** @deprecated Use conditionalPayment from the main exports */
+export const conditionalPayment = conditionalPaymentV1;
+/** @deprecated Use tieredPayment from the main exports */
+export const tieredPayment = tieredPaymentV1;
+/** @deprecated Use paymentRateLimit from the main exports */
+export const paymentRateLimit = paymentRateLimitV1;
