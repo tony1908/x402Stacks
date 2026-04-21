@@ -4,13 +4,13 @@
  * Note: For new projects, use paymentMiddleware from middleware-v2.ts
  */
 
+import { randomBytes } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { X402PaymentVerifierV1, SettleOptionsV1 } from './verifier';
 import {
   X402MiddlewareConfig,
   X402PaymentRequired,
 } from './types';
-import { randomBytes } from 'crypto';
 
 /**
  * Express middleware for x402 V1 payment requirements
