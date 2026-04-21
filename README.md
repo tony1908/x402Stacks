@@ -317,6 +317,10 @@ import {
   getDefaultSBTCContract,
   networkToCAIP2,
   caip2ToNetwork,
+  createFacilitatorNonce,
+  createFacilitatorMemo,
+  isFacilitatorMemo,
+  parsePaymentMemo,
 } from 'x402-stacks';
 
 // Convert amounts
@@ -423,6 +427,31 @@ app.get('/api/market-data/:tier',
     res.json({ marketData: getMarketData(req.params.tier) });
   }
 );
+```
+
+## Facilitator Memo Convention (V2)
+
+When the SDK signs a facilitator-bound transaction in the default V2 flow, it writes the memo before signing using:
+
+```text
+x402:<24-char-base64url-nonce>
+```
+
+- STX transfers store the memo in the transaction memo field.
+- sBTC and USDCx transfers store the same value in the SIP-010 optional memo argument.
+- Legacy V1 flows keep their existing memo behavior and do not use this convention automatically.
+- The prefix is intended for analytics and transaction attribution only.
+- The prefix is not cryptographic proof that the facilitator handled the payment.
+
+The SDK exports the following helpers from the root module:
+
+```ts
+import {
+  createFacilitatorNonce,
+  createFacilitatorMemo,
+  isFacilitatorMemo,
+  parsePaymentMemo,
+} from 'x402-stacks';
 ```
 
 ## sBTC Support
