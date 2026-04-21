@@ -34,6 +34,10 @@ describe('facilitator memo helpers', () => {
     });
   });
 
+  it('rejects malformed compact facilitator memos', () => {
+    expect(parsePaymentMemo('x402:not-a-valid-nonce')).toEqual({});
+  });
+
   it('preserves parsing for legacy createPaymentMemo output', () => {
     expect(parsePaymentMemo('x402:/premium,nonce=Ab3Kx9mPqR2sT5vW8yZ1aB3K')).toEqual({
       resource: '/premium',
@@ -43,6 +47,7 @@ describe('facilitator memo helpers', () => {
 
   it('recognizes facilitator memos by prefix', () => {
     expect(isFacilitatorMemo('x402:Ab3Kx9mPqR2sT5vW8yZ1aB3K')).toBe(true);
+    expect(isFacilitatorMemo('x402:/premium,nonce=Ab3Kx9mPqR2sT5vW8yZ1aB3K')).toBe(false);
     expect(isFacilitatorMemo('nonce=abc123')).toBe(false);
   });
 });
