@@ -43,7 +43,8 @@ export function createFacilitatorMemo(nonce: string): string {
 }
 
 export function isFacilitatorMemo(memo: string): boolean {
-  return new RegExp(`^${FACILITATOR_MEMO_PREFIX}[A-Za-z0-9_-]{24}$`).test(memo);
+  return memo.startsWith(FACILITATOR_MEMO_PREFIX)
+    && FACILITATOR_NONCE_PATTERN.test(memo.substring(FACILITATOR_MEMO_PREFIX.length));
 }
 
 /**
