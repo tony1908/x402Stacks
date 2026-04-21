@@ -172,6 +172,9 @@ export {
   formatPaymentAmount,
   parsePaymentMemo,
   createPaymentMemo,
+  createFacilitatorNonce,
+  createFacilitatorMemo,
+  isFacilitatorMemo,
   estimateFee,
 
   // Timing utilities

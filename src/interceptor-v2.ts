@@ -28,7 +28,7 @@ import {
   STACKS_NETWORKS,
   NetworkV2,
 } from './types-v2';
-import { networkFromCAIP2, assetFromV2 } from './utils';
+import { networkFromCAIP2, assetFromV2, createFacilitatorMemo, createFacilitatorNonce } from './utils';
 
 /**
  * Create a Stacks account from a private key
@@ -133,8 +133,7 @@ async function signPaymentV2(
   const network = getNetworkInstanceFromCAIP2(paymentRequirements.network);
   const v1Network = networkFromCAIP2(paymentRequirements.network);
 
-  // Generate a short memo (max 34 bytes for Stacks)
-  const memo = `x402:${Date.now().toString(36)}`.substring(0, 34);
+  const memo = createFacilitatorMemo(createFacilitatorNonce());
 
   if (tokenType === 'sBTC' || tokenType === 'USDCx') {
     // SIP-010 token transfer
