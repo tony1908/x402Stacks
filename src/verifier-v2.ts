@@ -44,7 +44,7 @@ export class X402PaymentVerifier {
     this.facilitatorUrl = facilitatorUrl.replace(/\/$/, ''); // Remove trailing slash
 
     this.httpClient = axios.create({
-      timeout: 30000, // V2 may need longer timeout for settlement
+      timeout: 50000, // V2 settlement can take longer while facilitator confirms
       headers: {
         'Content-Type': 'application/json',
       },
