@@ -30,6 +30,7 @@ import {
   TokenType,
 } from './types';
 
+
 /**
  * Payment client for making x402 payments on Stacks
  */

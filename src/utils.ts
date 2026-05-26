@@ -3,10 +3,49 @@
  * Helper functions for working with x402 payments on Stacks
  */
 
+import { createHash, randomBytes } from 'crypto';
 import { makeRandomPrivKey, getPublicKey, publicKeyToAddress, AddressVersion } from '@stacks/transactions';
 import { StacksMainnet, StacksTestnet } from '@stacks/network';
 import { NetworkType, TokenType, TokenContract } from './types';
 import { NetworkV2, STACKS_NETWORKS } from './types-v2';
+
+const FACILITATOR_MEMO_PREFIX = 'x402:';
+const FACILITATOR_NONCE_BYTES = 18;
+const STACKS_MEMO_MAX_BYTES = 34;
+const FACILITATOR_NONCE_PATTERN = /^[A-Za-z0-9_-]{24}$/;
+
+function normalizeFacilitatorNonce(nonce: string): string {
+  if (FACILITATOR_NONCE_PATTERN.test(nonce)) {
+    return nonce;
+  }
+
+  return createHash('sha256')
+    .update(nonce)
+    .digest()
+    .subarray(0, FACILITATOR_NONCE_BYTES)
+    .toString('base64url');
+}
+
+export function createFacilitatorNonce(
+  generator: (size: number) => Buffer = randomBytes
+): string {
+  return generator(FACILITATOR_NONCE_BYTES).toString('base64url');
+}
+
+export function createFacilitatorMemo(nonce: string): string {
+  const memo = `${FACILITATOR_MEMO_PREFIX}${normalizeFacilitatorNonce(nonce)}`;
+
+  if (Buffer.byteLength(memo, 'utf8') > STACKS_MEMO_MAX_BYTES) {
+    throw new Error('Facilitator memo exceeds the 34-byte Stacks memo limit');
+  }
+
+  return memo;
+}
+
+export function isFacilitatorMemo(memo: string): boolean {
+  return memo.startsWith(FACILITATOR_MEMO_PREFIX)
+    && FACILITATOR_NONCE_PATTERN.test(memo.substring(FACILITATOR_MEMO_PREFIX.length));
+}
 
 /**
  * Convert microSTX to STX
@@ -162,17 +201,29 @@ export function parsePaymentMemo(memo: string): {
     custom?: Record<string, string>;
   } = {};
 
-  if (!memo.startsWith('x402:')) {
+  if (!memo.startsWith(FACILITATOR_MEMO_PREFIX)) {
     return result;
   }
 
-  // Remove x402: prefix
-  const content = memo.substring(5);
+  const content = memo.substring(FACILITATOR_MEMO_PREFIX.length);
 
-  // Split by comma
+  if (!content.includes('=')) {
+    if (!FACILITATOR_NONCE_PATTERN.test(content)) {
+      return result;
+    }
+
+    result.nonce = content;
+    return result;
+  }
+
   const parts = content.split(',');
 
-  for (const part of parts) {
+  for (const [index, part] of parts.entries()) {
+    if (!part.includes('=') && index === 0) {
+      result.resource = part;
+      continue;
+    }
+
     const [key, value] = part.split('=');
     if (key && value) {
       if (key === 'resource') {
@@ -180,9 +231,7 @@ export function parsePaymentMemo(memo: string): {
       } else if (key === 'nonce') {
         result.nonce = value;
       } else {
-        if (!result.custom) {
-          result.custom = {};
-        }
+        result.custom = result.custom || {};
         result.custom[key] = value;
       }
     }
