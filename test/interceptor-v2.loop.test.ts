@@ -1,0 +1,77 @@
+jest.mock('@stacks/network', () => ({
+  StacksMainnet: class {},
+  StacksTestnet: class {},
+}));
+
+import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { wrapAxiosWithPayment, X402_HEADERS } from '../src';
+
+const mockMakeSTXTokenTransfer = jest.fn();
+
+jest.mock('@stacks/transactions', () => ({
+  makeSTXTokenTransfer: (...args: unknown[]) => mockMakeSTXTokenTransfer(...args),
+  makeContractCall: jest.fn(),
+  makeStandardFungiblePostCondition: jest.fn(),
+  createAssetInfo: jest.fn(),
+  FungibleConditionCode: { Equal: 1 },
+  AnchorMode: { Any: 3 },
+  PostConditionMode: { Allow: 1, Deny: 2 },
+  uintCV: (value: string) => value,
+  principalCV: (value: string) => value,
+  someCV: (value: unknown) => value,
+  noneCV: () => null,
+  bufferCVFromString: (value: string) => value,
+  getAddressFromPrivateKey: () => 'ST2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7',
+  TransactionVersion: { Mainnet: 0, Testnet: 1 },
+}));
+
+describe('V2 payment retry loop guard', () => {
+  beforeEach(() => {
+    mockMakeSTXTokenTransfer.mockResolvedValue({ serialize: () => Uint8Array.from([1, 2, 3]) });
+  });
+
+  it('signs only once and surfaces the server reason when the paid retry gets another 402', async () => {
+    let calls = 0;
+    const paymentRequired = {
+      x402Version: 2,
+      resource: { url: 'https://api.example.com/premium' },
+      accepts: [{
+        scheme: 'exact',
+        network: 'stacks:2147483648',
+        amount: '1000',
+        asset: 'STX',
+        payTo: 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
+        maxTimeoutSeconds: 60,
+      }],
+    };
+    const requiredHeader = Buffer.from(JSON.stringify(paymentRequired)).toString('base64');
+    const instance = axios.create({
+      adapter: async (config) => {
+        calls += 1;
+        if (calls > 10) throw new Error('adapter call cap exceeded');
+        const response: AxiosResponse = {
+          data: calls === 1 ? paymentRequired : { error: 'transaction_failed' },
+          status: 402,
+          statusText: 'Payment Required',
+          // Keep the valid payment-required challenge present so a broken guard
+          // attempts to sign again; the error body carries the settlement reason.
+          headers: { [X402_HEADERS.PAYMENT_REQUIRED]: requiredHeader },
+          config: config as InternalAxiosRequestConfig,
+        };
+        throw new AxiosError('Request failed with status code 402', AxiosError.ERR_BAD_REQUEST, config, undefined, response);
+      },
+    });
+    wrapAxiosWithPayment(instance, {
+      address: 'ST2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7',
+      privateKey: '1'.repeat(64),
+      network: 'testnet',
+    });
+
+    await expect(instance.get('/premium')).rejects.toMatchObject({
+      message: expect.stringContaining('transaction_failed'),
+      response: expect.objectContaining({ status: 402, data: { error: 'transaction_failed' } }),
+    });
+    expect(calls).toBe(2);
+    expect(mockMakeSTXTokenTransfer).toHaveBeenCalledTimes(1);
+  });
+});
