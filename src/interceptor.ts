@@ -154,8 +154,29 @@ function isValidPaymentRequest(data: unknown): data is X402PaymentRequired {
   );
 }
 
-// Track which requests have already had payment attempted
-const paymentAttempted = new WeakSet<InternalAxiosRequestConfig>();
+function hasRequestHeader(headers: unknown, name: string): boolean {
+  if (!headers || typeof headers !== 'object') return false;
+
+  const axiosHeaders = headers as { get?: (headerName: string) => unknown };
+  const value = typeof axiosHeaders.get === 'function' ? axiosHeaders.get(name) : undefined;
+  if (value !== undefined && value !== null) return true;
+
+  const normalizedName = name.toLowerCase();
+  return Object.entries(headers).some(
+    ([headerName, headerValue]) => headerName.toLowerCase() === normalizedName && headerValue != null,
+  );
+}
+
+function paymentFailureAfterRetry(error: any): Error {
+  const reason = error.response?.data?.error;
+  const failure = new Error(
+    typeof reason === 'string' && reason.length > 0
+      ? `Payment failed: ${reason}`
+      : 'Payment failed: server returned 402 after payment was sent',
+  );
+  Object.assign(failure, { response: error.response, cause: error });
+  return failure;
+}
 
 /**
  * Wrap an axios instance with automatic x402 V1 payment handling
@@ -196,13 +217,10 @@ export function wrapAxiosWithPaymentV1(
         return Promise.reject(error);
       }
 
-      // Prevent infinite retry loops - only attempt payment once per request
-      if (paymentAttempted.has(originalRequest)) {
-        return Promise.reject(new Error('Payment already attempted for this request'));
+      // The retried Axios config may be cloned, so detect payment from its header.
+      if (hasRequestHeader(originalRequest?.headers, 'X-PAYMENT')) {
+        return Promise.reject(paymentFailureAfterRetry(error));
       }
-
-      // Mark this request as having payment attempted
-      paymentAttempted.add(originalRequest);
 
       const paymentRequest = error.response.data;
 

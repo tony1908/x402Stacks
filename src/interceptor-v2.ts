@@ -7,6 +7,9 @@ import { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import {
   makeSTXTokenTransfer,
   makeContractCall,
+  makeStandardFungiblePostCondition,
+  createAssetInfo,
+  FungibleConditionCode,
   AnchorMode,
   PostConditionMode,
   uintCV,
@@ -108,7 +111,7 @@ function getTokenContractForAsset(asset: string, network: NetworkType): TokenCon
   if (tokenType === 'sBTC') {
     return network === 'mainnet'
       ? { address: 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4', name: 'sbtc-token' }
-      : { address: 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT', name: 'sbtc-token' };
+      : { address: 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM', name: 'sbtc-token' };
   }
 
   if (tokenType === 'USDCx') {
@@ -118,6 +121,15 @@ function getTokenContractForAsset(asset: string, network: NetworkType): TokenCon
   }
 
   return undefined;
+}
+
+/** FT asset names (define-fungible-token) of the tokens facilitators sponsor. */
+const FT_ASSET_NAMES: Record<string, string> = { 'sbtc-token': 'sbtc-token', usdcx: 'usdcx-token' };
+
+function ftAssetName(contractName: string): string {
+  const name = FT_ASSET_NAMES[contractName];
+  if (!name) throw new Error(`Sponsored payments are not supported for token contract ${contractName}`);
+  return name;
 }
 
 /**
@@ -134,6 +146,9 @@ async function signPaymentV2(
   const v1Network = networkFromCAIP2(paymentRequirements.network);
 
   const memo = createFacilitatorMemo(createFacilitatorNonce());
+  // Facilitator pays the fee: sign as a sponsored tx with zero origin fee.
+  const sponsored = typeof paymentRequirements.extra?.feePayer === 'string';
+  const sponsorOpts = sponsored ? { sponsored: true, fee: 0n } : {};
 
   if (tokenType === 'sBTC' || tokenType === 'USDCx') {
     // SIP-010 token transfer
@@ -158,7 +173,21 @@ async function signPaymentV2(
       senderKey: account.privateKey,
       network,
       anchorMode: AnchorMode.Any,
-      postConditionMode: PostConditionMode.Allow,
+      ...sponsorOpts,
+      ...(sponsored
+        ? {
+            // Sponsors pay for aborted calls, so they require Deny mode + the exact transfer.
+            postConditionMode: PostConditionMode.Deny,
+            postConditions: [
+              makeStandardFungiblePostCondition(
+                account.address,
+                FungibleConditionCode.Equal,
+                amount,
+                createAssetInfo(tokenContract.address, tokenContract.name, ftAssetName(tokenContract.name)),
+              ),
+            ],
+          }
+        : { postConditionMode: PostConditionMode.Allow }),
     });
 
     const serialized = transaction.serialize();
@@ -172,6 +201,7 @@ async function signPaymentV2(
       network,
       memo,
       anchorMode: AnchorMode.Any,
+      ...sponsorOpts,
     });
 
     const serialized = transaction.serialize();
@@ -218,8 +248,29 @@ function selectPaymentOption(
   return compatibleOption || null;
 }
 
-// Track which requests have already had payment attempted
-const paymentAttempted = new WeakSet<InternalAxiosRequestConfig>();
+function hasRequestHeader(headers: unknown, name: string): boolean {
+  if (!headers || typeof headers !== 'object') return false;
+
+  const axiosHeaders = headers as { get?: (headerName: string) => unknown };
+  const value = typeof axiosHeaders.get === 'function' ? axiosHeaders.get(name) : undefined;
+  if (value !== undefined && value !== null) return true;
+
+  const normalizedName = name.toLowerCase();
+  return Object.entries(headers).some(
+    ([headerName, headerValue]) => headerName.toLowerCase() === normalizedName && headerValue != null,
+  );
+}
+
+function paymentFailureAfterRetry(error: any): Error {
+  const reason = error.response?.data?.error;
+  const failure = new Error(
+    typeof reason === 'string' && reason.length > 0
+      ? `Payment failed: ${reason}`
+      : 'Payment failed: server returned 402 after payment was sent',
+  );
+  Object.assign(failure, { response: error.response, cause: error });
+  return failure;
+}
 
 /**
  * Wrap an axios instance with automatic x402 payment handling
@@ -260,13 +311,10 @@ export function wrapAxiosWithPayment(
         return Promise.reject(error);
       }
 
-      // Prevent infinite retry loops - only attempt payment once per request
-      if (paymentAttempted.has(originalRequest)) {
-        return Promise.reject(new Error('Payment already attempted for this request'));
+      // The retried Axios config may be cloned, so detect payment from its header.
+      if (hasRequestHeader(originalRequest?.headers, X402_HEADERS.PAYMENT_SIGNATURE)) {
+        return Promise.reject(paymentFailureAfterRetry(error));
       }
-
-      // Mark this request as having payment attempted
-      paymentAttempted.add(originalRequest);
 
       // Try to get payment requirements from header first, then body
       let paymentRequired: PaymentRequiredV2 | null = null;

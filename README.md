@@ -502,7 +502,7 @@ const data = await api.get('http://localhost:3003/api/bitcoin-data');
 
 ### sBTC Contracts
 
-**Testnet**: `ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token`
+**Testnet**: `ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc-token`
 
 **Mainnet**: To be configured when sBTC mainnet launches
 
@@ -515,6 +515,29 @@ The library uses a facilitator service to broadcast and confirm transactions.
 - `GET /supported` - Returns supported payment kinds and networks
 - `POST /verify` - Verify a payment payload before settlement
 - `POST /settle` - Broadcast signed transaction and wait for confirmation
+
+### Sponsored transactions (gasless for payers)
+
+A resource server can sponsor transaction fees by fetching the facilitator's fee payer address from `GET {facilitatorUrl}/supported` and passing it in `extra.feePayer`:
+
+```typescript
+const supported = await (await fetch(`${facilitatorUrl}/supported`)).json();
+const feePayer = supported.signers['stacks:1'][0]; // Use 'stacks:2147483648' for testnet
+
+app.get(
+  '/api/premium',
+  paymentMiddleware({
+    network: 'mainnet',
+    amount: '1000',
+    payTo: process.env.PAY_TO!,
+    facilitatorUrl,
+    extra: { feePayer },
+  }),
+  handler,
+);
+```
+
+Clients need no changes: `wrapAxiosWithPayment` signs a sponsored transaction when `extra.feePayer` is present, so payers do not need STX for fees. Sponsored SIP-010 payments use Deny mode with an exact post-condition. Sponsored SIP-010 payments currently support only sBTC and USDCx.
 
 ### Legacy V1 Endpoints
 

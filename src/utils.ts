@@ -352,7 +352,7 @@ export function getDefaultSBTCContract(network: NetworkType): TokenContract {
   } else {
     // Testnet sBTC contract
     return {
-      address: 'ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT',
+      address: 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
       name: 'sbtc-token',
     };
   }
