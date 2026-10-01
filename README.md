@@ -4,10 +4,13 @@ A TypeScript library for implementing the x402 payment protocol on Stacks blockc
 
 x402 enables **automatic HTTP-level payments** for APIs, AI agents, and digital services using STX or sBTC tokens on Stacks. Pay only for what you use, right when you use it. No subscriptions, no API keys, no intermediaries.
 
+> **Upgrade notice:** All versions before 2.1.0 can pay more than once when a paid retry gets a 402 response. Upgrade with `npm install x402-stacks@^2.1.0`.
+
 ## Features
 
 - **HTTP 402 Payment Required** - Native payment protocol using HTTP status codes you already know
 - **Multi-Token Support** - Accept payments in STX or sBTC (Bitcoin on Stacks)
+- **Sponsored (Gasless) Payments** - Let a facilitator pay transaction fees for the payer
 - **Automatic Payments** - Client pays automatically via axios interceptor
 - **Facilitator Pattern** - Client signs, server settles via facilitator for reliable payments
 - **Express.js Middleware** - Plug and play, protect your endpoints with payments
@@ -57,7 +60,7 @@ app.get(
   '/api/premium-data',
   paymentMiddleware({
     amount: STXtoMicroSTX(0.1), // 0.1 STX
-    address: 'SP1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
+    payTo: 'SP1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
     network: 'mainnet',
     facilitatorUrl: 'https://x402-facilitator.example.com',
   }),
@@ -68,6 +71,54 @@ app.get(
 
 app.listen(3000);
 ```
+
+## Sponsored transactions (gasless for payers)
+
+Sponsored payments let a facilitator pay the Stacks transaction fee, so the payer does not need STX for fees. This is useful for sBTC and USDCx payers, including AI agents that should not need a separate STX balance.
+
+To use sponsorship, choose a facilitator that supports it, such as [x402-stacks-sponsor-facilitator](https://github.com/x402Stacks/x402-stacks-sponsor-facilitator), and make sure your merchant `payTo` address is allowlisted by that facilitator. Fetch the sponsor address for the same network your route uses and pass it as `extra.feePayer`:
+
+```typescript
+const facilitatorUrl = 'https://your-facilitator.example.com';
+const supported = await (await fetch(`${facilitatorUrl}/supported`)).json();
+
+// Select the signer for the route's network:
+const mainnetFeePayer = supported.signers['stacks:1'][0];
+const testnetFeePayer = supported.signers['stacks:2147483648'][0];
+
+app.get('/api/premium', paymentMiddleware({
+  network: 'mainnet', // or 'testnet'
+  amount: '1000',
+  payTo: process.env.PAY_TO!,
+  facilitatorUrl,
+  extra: { feePayer: mainnetFeePayer }, // use testnetFeePayer for testnet
+}), handler);
+```
+
+For an sBTC-priced route, use the V2 asset identifier `SBTC` and set the amount in satoshis:
+
+```typescript
+app.get('/api/bitcoin-data', paymentMiddleware({
+  network: 'mainnet',
+  amount: '1000', // satoshis
+  asset: 'SBTC',
+  payTo: process.env.PAY_TO!,
+  facilitatorUrl,
+  extra: { feePayer: mainnetFeePayer },
+}), handler);
+```
+
+The client needs no changes. When `extra.feePayer` is present, the V2 client signs a sponsored transaction with a zero origin fee. For SIP-010 token transfers, it uses Deny post-condition mode and an exact post-condition for the payer's transfer amount. Sponsored SIP-010 payments support sBTC and USDCx only.
+
+Facilitators may return these error reasons in a failed settlement response:
+
+- `sponsorship_not_allowed` - The payTo address is not in the facilitator's sponsorship allowlist (or sponsorship is disabled).
+- `payer_has_pending_transactions` - The payer already has transactions waiting in the mempool, so the facilitator will not sponsor until they confirm.
+- `duplicate_payment` - A payment with the same payer and nonce is already being settled.
+- `rate_limited` - The payer exceeded the facilitator's per-minute limit for sponsored payments.
+- `sponsor_budget_exceeded` - The merchant's daily sponsored-fee budget is used up.
+- `sponsor_unavailable` - The sponsor's STX balance is too low to pay the fee.
+- `invalid_post_conditions` - The transaction's post-conditions don't match what sponsorship requires (none for STX, exactly one exact transfer condition for sBTC/USDCx).
 
 ## How Does It Work?
 
@@ -147,7 +198,8 @@ The V2 facilitator provides these endpoints at the root level:
       "network": "stacks:2147483648",
       "amount": "100000",
       "asset": "STX",
-      "payTo": "ST1..."
+      "payTo": "ST1...",
+      "maxTimeoutSeconds": 300
     }
   },
   "paymentRequirements": {
@@ -155,7 +207,8 @@ The V2 facilitator provides these endpoints at the root level:
     "network": "stacks:2147483648",
     "amount": "100000",
     "asset": "STX",
-    "payTo": "ST1..."
+    "payTo": "ST1...",
+    "maxTimeoutSeconds": 300
   }
 }
 ```
@@ -191,6 +244,18 @@ const api = wrapAxiosWithPayment(
 
 // All requests automatically handle 402 responses
 const data = await api.get('/premium-endpoint');
+```
+
+If a paid retry still receives HTTP 402, the promise rejects with an `Error` whose message is `Payment failed: <reason>` when the server returns a string `error` reason. The original Axios response is attached as `error.response`. If the server provides no string reason, the message is `Payment failed: server returned 402 after payment was sent`.
+
+```typescript
+try {
+  await api.get('/premium-endpoint');
+} catch (error) {
+  const paymentError = error as Error & { response?: { status: number; data: unknown } };
+  console.error(paymentError.message);
+  console.error('Original response:', paymentError.response?.status, paymentError.response?.data);
+}
 ```
 
 #### `privateKeyToAccount`
@@ -245,15 +310,15 @@ Express middleware for requiring payment:
 
 ```typescript
 paymentMiddleware({
-  amount: string | bigint,           // Amount in microSTX or sats
-  address: string,                   // Your Stacks address
-  network: 'mainnet' | 'testnet',
+  amount: string | bigint,           // Amount in atomic units (microSTX, sats, etc.)
+  payTo: string,                     // Recipient Stacks address
+  network: 'mainnet' | 'testnet' | 'stacks:1' | 'stacks:2147483648',
   facilitatorUrl?: string,           // Facilitator API URL
-  resource?: string,                 // Custom resource identifier
+  asset?: string,                    // V2 asset identifier (for example, 'STX' or 'SBTC')
   description?: string,              // Human-readable description
   mimeType?: string,                 // Response MIME type
-  tokenType?: 'STX' | 'sBTC',        // Default: 'STX'
-  tokenContract?: TokenContract,     // Required for sBTC
+  tokenType?: 'STX' | 'sBTC' | 'USDCx', // Legacy compatibility; default: 'STX'
+  tokenContract?: TokenContract,     // Token contract for legacy compatibility
 })
 ```
 
@@ -283,19 +348,23 @@ import { X402PaymentVerifier, createVerifier } from 'x402-stacks';
 
 // Using the class
 const verifier = new X402PaymentVerifier(
-  'https://facilitator.example.com',
-  'testnet'
+  'https://facilitator.example.com'
 );
 
 // Or using the factory function
-const verifier = createVerifier('https://facilitator.example.com', 'testnet');
+const verifier = createVerifier('https://facilitator.example.com');
 
-// Settle a signed transaction (broadcasts via facilitator)
-const result = await verifier.settle(signedTxHex, {
-  recipient: 'ST1...',
+// Settle a signed transaction payload (broadcasts via facilitator)
+const paymentRequirements = {
+  scheme: 'exact',
+  network: 'stacks:2147483648',
   amount: '100000',
   asset: 'STX',
-});
+  payTo: 'ST1...',
+  maxTimeoutSeconds: 300,
+} as const;
+const paymentPayload = X402PaymentVerifier.createPaymentPayload(signedTxHex, paymentRequirements);
+const result = await verifier.settle(paymentPayload, { paymentRequirements });
 
 if (result.success) {
   console.log('Payment confirmed:', result.transaction);
@@ -504,7 +573,13 @@ const data = await api.get('http://localhost:3003/api/bitcoin-data');
 
 **Testnet**: `ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc-token`
 
-**Mainnet**: To be configured when sBTC mainnet launches
+**Mainnet**: `SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token`
+
+### USDCx Contracts
+
+**Testnet**: `ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usdcx`
+
+**Mainnet**: `SP120SBRBQJ00MCWS7TM5R8WJNTTKD5K0HFRC2CNE.usdcx`
 
 ## Facilitator API
 
@@ -516,28 +591,7 @@ The library uses a facilitator service to broadcast and confirm transactions.
 - `POST /verify` - Verify a payment payload before settlement
 - `POST /settle` - Broadcast signed transaction and wait for confirmation
 
-### Sponsored transactions (gasless for payers)
-
-A resource server can sponsor transaction fees by fetching the facilitator's fee payer address from `GET {facilitatorUrl}/supported` and passing it in `extra.feePayer`:
-
-```typescript
-const supported = await (await fetch(`${facilitatorUrl}/supported`)).json();
-const feePayer = supported.signers['stacks:1'][0]; // Use 'stacks:2147483648' for testnet
-
-app.get(
-  '/api/premium',
-  paymentMiddleware({
-    network: 'mainnet',
-    amount: '1000',
-    payTo: process.env.PAY_TO!,
-    facilitatorUrl,
-    extra: { feePayer },
-  }),
-  handler,
-);
-```
-
-Clients need no changes: `wrapAxiosWithPayment` signs a sponsored transaction when `extra.feePayer` is present, so payers do not need STX for fees. Sponsored SIP-010 payments use Deny mode with an exact post-condition. Sponsored SIP-010 payments currently support only sBTC and USDCx.
+For sponsored payments, requirements, server setup, client behavior, and limits, see [Sponsored transactions (gasless for payers)](#sponsored-transactions-gasless-for-payers).
 
 ### Legacy V1 Endpoints
 
@@ -546,7 +600,7 @@ Clients need no changes: `wrapAxiosWithPayment` signs a sponsored transaction wh
 
 ### Default Facilitator
 
-**Default URL**: `https://x402-backend-7eby.onrender.com`
+When `facilitatorUrl` is omitted, `paymentMiddleware` and `X402PaymentVerifier` use `http://localhost:8085`.
 
 You can run your own facilitator or use a custom one:
 
